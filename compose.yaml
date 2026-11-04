@@ -1,0 +1,25 @@
+# Services de Penny. Toutes les publications de ports sur 127.0.0.1 uniquement.
+# Versions figées obligatoires (pas de :latest).
+#
+# Profils :
+#   mac        inférence native (Ollama hors Docker), le reste ici
+#   linux-gpu  inférence en conteneur avec GPU NVIDIA
+#
+# Les services seront ajoutés au fil de l'It. 0 (base, Penny Core, Hermes, signal-cli).
+
+services:
+  ollama:
+    profiles: ["linux-gpu"]
+    image: ollama/ollama:0.30.7   # même version que sur le Mac ; à vérifier au passage sur la cible
+    ports:
+      - "127.0.0.1:11434:11434"
+    volumes:
+      - ${PENNY_DATA_DIR}/ollama:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped

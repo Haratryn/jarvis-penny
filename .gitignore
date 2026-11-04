@@ -1,0 +1,26 @@
+# Configuration locale et secrets : jamais dans Git
+config/machine.env
+*.env
+!config/machine.example.env
+*.key
+*.pem
+secrets/
+
+# Données : jamais dans Git (les fixtures inventées sont l'exception)
+data/
+backups/
+vault/
+*.sqlite
+*.sqlite3
+*.db
+
+# Modèles et caches
+models/
+.cache/
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+
+# Système
+.DS_Store
