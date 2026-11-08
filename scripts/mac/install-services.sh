@@ -82,8 +82,25 @@ source "$CONF"
 
 PENNY_HOME="$(dscl . -read "/Users/$SERVICE_USER" NFSHomeDirectory | awk '{print $2}')"
 LOG_DIR="$PENNY_HOME/Library/Logs/penny"
-ORB_BIN="${PENNY_ORB_BIN:-/opt/homebrew/bin/orb}"
-OLLAMA_BIN="${PENNY_OLLAMA_BIN:-/opt/homebrew/bin/ollama}"
+# Chemin donné dans machine.env, sinon premier emplacement connu qui existe.
+# Les copies dans le dossier de penny (~/.orbstack/bin…) sont exclues : penny pourrait les modifier.
+find_binary() {
+  local given="$1"; shift
+  if [[ -n "$given" ]]; then echo "$given"; return; fi
+  local c
+  for c in "$@"; do
+    [[ -x "$c" ]] && { echo "$c"; return; }
+  done
+  echo "$1"
+}
+ORB_BIN="$(find_binary "${PENNY_ORB_BIN:-}" \
+  /Applications/OrbStack.app/Contents/MacOS/bin/orb \
+  /opt/homebrew/bin/orb \
+  /usr/local/bin/orb)"
+OLLAMA_BIN="$(find_binary "${PENNY_OLLAMA_BIN:-}" \
+  /opt/homebrew/bin/ollama \
+  /Applications/Ollama.app/Contents/Resources/ollama \
+  /usr/local/bin/ollama)"
 
 # Règle 5 : Ollama sur 127.0.0.1 uniquement.
 OLLAMA_HOST="${PENNY_OLLAMA_URL#http://}"

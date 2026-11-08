@@ -178,9 +178,12 @@ Le script refuse tout binaire que `penny` pourrait modifier, et les plists n'app
 $ cd ~/GIT/penny
 $ git pull
 $ cp -n config/machine.example.env config/machine.env   # si absent
-$ ls -l /opt/homebrew/bin/orb /opt/homebrew/bin/ollama  # sinon renseigner PENNY_*_BIN
 $ sudo ./scripts/mac/install-services.sh
 ```
+Le script trouve seul `orb` et `ollama` dans les emplacements connus (appli dans
+`/Applications`, Homebrew). En cas d'échec, renseigner `PENNY_ORB_BIN` ou `PENNY_OLLAMA_BIN`
+dans `config/machine.env` (chemin donné par `ls -l $(which orb)`).
+
 Attendu : les deux binaires `non modifiable par penny`, deux lignes `root:wheel 644`,
 `installé, chargé`, puis `Ollama répond sur 127.0.0.1:11435`.
 
@@ -232,6 +235,7 @@ relance tous les conteneurs. Ces LaunchDaemons disparaissent à la migration.
 | Un second `su - penny` se lance tout seul | Plusieurs lignes collées d'un coup après un `su` | Coller ligne par ligne ; `exit` jusqu'à retrouver votre invite |
 | `zsh: you have running jobs` | Ollama lancé en tâche de fond | `disown` puis `exit` |
 | Écran « Docker / Kubernetes / Linux » | Premier lancement d'OrbStack | Choisir Docker |
+| `orb introuvable … /opt/homebrew/bin/orb` | OrbStack installé depuis l'appli : `orb` est dans `/Applications/OrbStack.app` | Corrigé : détection automatique (sinon `PENNY_ORB_BIN`) |
 
 ## Constats de sécurité (testés)
 
