@@ -118,8 +118,11 @@ $ su - penny -c "docker version --format '{{.Server.Version}}'"
 > Lancement manuel, une seule fois, pour valider. L'étape 10 arrête cette instance et confie
 > Ollama à launchd.
 >
-> **À compléter** : l'installation d'Ollama n'est pas encore décrite. Noter la sortie de
-> `ls -l $(which ollama)` (formule Homebrew ou appli Ollama.app) pour l'ajouter ici et figer la version.
+> **Constaté le 08/11** : Ollama est installé par l'appli **Ollama.app** (téléchargée sur
+> ollama.com) ; binaire `/Applications/Ollama.app/Contents/Resources/ollama`, lien
+> `/usr/local/bin/ollama`. **Problème ouvert** : l'appli se met à jour seule, donc la version
+> de `penny` n'est pas figée. À décider : couper la mise à jour automatique, ou passer à un
+> binaire versionné installé par le script.
 
 L'Ollama de votre compte occupe le port 11434 : celui de `penny` prend **11435**.
 Les deux ne doivent pas charger de modèle en même temps (16 Go de mémoire).
