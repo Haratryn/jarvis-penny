@@ -12,7 +12,7 @@ Assistant personnel local : seconde mémoire, suivi des engagements, anticipatio
 | `scripts/` | `install.sh` : seul point d'entrée d'installation |
 | `src/` | Code de Penny (Core, serveur MCP, circuit d'action) |
 | `tests/fixtures/` | Jeu de test inventé, en français, avec réponses attendues |
-| `docs/` | Décisions et notes techniques |
+| `docs/` | Décisions, notes techniques et tutoriels (`installation-mac.md`) |
 
 ## Installation
 
