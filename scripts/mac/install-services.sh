@@ -1,24 +1,31 @@
 #!/usr/bin/env bash
-# Profil mac — partie administrateur : démarrage automatique de Docker (OrbStack) et
-# d'Ollama pour le compte penny, via deux LaunchDaemons système (UserName=penny).
+# Profil mac — partie administrateur : démarrage automatique d'Ollama pour le compte penny,
+# via un LaunchDaemon système (UserName=penny).
+#
+# Le Docker de penny (OrbStack) n'est PAS démarré automatiquement : testé le 08/11/2026,
+# OrbStack lancé par launchd échoue au démarrage à froid (TCC, Group Containers).
+# Le Mac sert au développement ; le service 24 h/24 sera assuré par le PC Linux.
+# Après un redémarrage : su - penny -c 'orb start'
 #
 # À lancer depuis le compte du développeur (administrateur), jamais depuis penny :
 #   sudo ./scripts/mac/install-services.sh             installer ou mettre à jour
 #   sudo ./scripts/mac/install-services.sh --uninstall désinstaller
 #        ./scripts/mac/install-services.sh --status    état (sans sudo)
 #
-# Compatible bash 3.2 (celui de macOS). Idempotent. Aucun secret.
+# Compatible bash 3.2 (celui de macOS). Idempotent. Aucun secret lu ni écrit.
 # Équivalent sur le PC IA Linux (profil linux-gpu) : aucun daemon propre à Penny ;
 # systemd démarre Docker et Compose relance tout, Ollama compris (restart: unless-stopped).
-# Les secrets ne sont pas lus ici. Les plists générés appartiennent à root et ne sont pas
-# modifiables par penny ; ils n'appellent que des binaires que penny ne peut pas modifier.
+# Le plist généré appartient à root et n'est pas modifiable par penny ; il n'appelle
+# qu'un binaire que penny ne peut pas modifier.
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 TEMPLATE_DIR="$REPO_DIR/deploy/mac/launchd"
 DAEMON_DIR="/Library/LaunchDaemons"
 SERVICE_USER="penny"
-LABELS=(local.penny.orbstack local.penny.ollama)
+LABELS=(local.penny.ollama)
+# Services abandonnés : retirés à chaque installation ou désinstallation.
+RETIRED_LABELS=(local.penny.orbstack)
 
 info() { echo "  $1"; }
 die()  { echo "ERREUR : $1" >&2; exit 1; }
@@ -27,7 +34,8 @@ die()  { echo "ERREUR : $1" >&2; exit 1; }
 
 # --- État -------------------------------------------------------------------
 status() {
-  for label in "${LABELS[@]}"; do
+  local label state
+  for label in "${LABELS[@]}" "${RETIRED_LABELS[@]}"; do
     if [[ -f "$DAEMON_DIR/$label.plist" ]]; then
       if launchctl print "system/$label" >/dev/null 2>&1; then
         state="$(launchctl print "system/$label" 2>/dev/null | awk -F'= ' '/^\tstate =/ {print $2; exit}')"
@@ -51,7 +59,7 @@ fi
 [[ -n "${SUDO_USER:-}" && "$SUDO_USER" != "$SERVICE_USER" ]] || die "lancer avec sudo depuis le compte du développeur, pas depuis $SERVICE_USER"
 id "$SERVICE_USER" >/dev/null 2>&1 || die "compte $SERVICE_USER introuvable (tutoriel, étape 2)"
 
-# --- Désinstallation ----------------------------------------------------------
+# --- Retrait ------------------------------------------------------------------
 bootout() {
   local label="$1"
   if launchctl print "system/$label" >/dev/null 2>&1; then
@@ -59,15 +67,21 @@ bootout() {
   fi
 }
 
-if [[ "${1:-}" == "--uninstall" ]]; then
-  echo "Désinstallation :"
-  for label in "${LABELS[@]}"; do
+remove() {
+  local label="$1"
+  if [[ -f "$DAEMON_DIR/$label.plist" ]] || launchctl print "system/$label" >/dev/null 2>&1; then
     bootout "$label"
     rm -f "$DAEMON_DIR/$label.plist"
     info "$label retiré"
+  fi
+}
+
+if [[ "${1:-}" == "--uninstall" ]]; then
+  echo "Désinstallation :"
+  for label in "${LABELS[@]}" "${RETIRED_LABELS[@]}"; do
+    remove "$label"
   done
-  info "Les processus déjà lancés continuent jusqu'au prochain redémarrage."
-  info "Pour les arrêter tout de suite : su - $SERVICE_USER -c 'orb stop; pkill -f \"ollama serve\"'"
+  info "Ollama s'arrête avec son service ; il ne redémarrera plus au boot."
   exit 0
 fi
 
@@ -82,8 +96,8 @@ source "$CONF"
 
 PENNY_HOME="$(dscl . -read "/Users/$SERVICE_USER" NFSHomeDirectory | awk '{print $2}')"
 LOG_DIR="$PENNY_HOME/Library/Logs/penny"
+
 # Chemin donné dans machine.env, sinon premier emplacement connu qui existe.
-# Les copies dans le dossier de penny (~/.orbstack/bin…) sont exclues : penny pourrait les modifier.
 find_binary() {
   local given="$1"; shift
   if [[ -n "$given" ]]; then echo "$given"; return; fi
@@ -93,13 +107,9 @@ find_binary() {
   done
   echo "$1"
 }
-ORB_BIN="$(find_binary "${PENNY_ORB_BIN:-}" \
-  /Applications/OrbStack.app/Contents/MacOS/bin/orb \
-  /opt/homebrew/bin/orb \
-  /usr/local/bin/orb)"
 OLLAMA_BIN="$(find_binary "${PENNY_OLLAMA_BIN:-}" \
-  /opt/homebrew/bin/ollama \
   /Applications/Ollama.app/Contents/Resources/ollama \
+  /opt/homebrew/bin/ollama \
   /usr/local/bin/ollama)"
 
 # Règle 5 : Ollama sur 127.0.0.1 uniquement.
@@ -130,7 +140,6 @@ check_binary() {
 
 echo "Vérifications :"
 safe_path "$PENNY_HOME"
-check_binary orb "$ORB_BIN" PENNY_ORB_BIN
 check_binary ollama "$OLLAMA_BIN" PENNY_OLLAMA_BIN
 info "Ollama écoutera sur $OLLAMA_HOST"
 
@@ -138,7 +147,6 @@ info "Ollama écoutera sur $OLLAMA_HOST"
 render() {
   sed -e "s|@PENNY_HOME@|$PENNY_HOME|g" \
       -e "s|@LOG_DIR@|$LOG_DIR|g" \
-      -e "s|@ORB_BIN@|$ORB_BIN|g" \
       -e "s|@OLLAMA_BIN@|$OLLAMA_BIN|g" \
       -e "s|@OLLAMA_HOST@|$OLLAMA_HOST|g" \
       "$1"
@@ -149,6 +157,10 @@ sudo -u "$SERVICE_USER" mkdir -p "$LOG_DIR"
 sudo -u "$SERVICE_USER" chmod 700 "$LOG_DIR"
 
 echo "Installation :"
+for label in "${RETIRED_LABELS[@]}"; do
+  remove "$label"
+done
+
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 

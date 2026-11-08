@@ -89,7 +89,11 @@ level=fatal msg="panic: missing TCC permission for data storage directory: permi
 
 ## 7. Démarrer le Docker de `penny` depuis votre session
 
-> Lancement manuel, une seule fois, pour valider. Après l'étape 10, le démarrage est automatique.
+> Le Docker de `penny` **ne démarre pas automatiquement** sur le Mac (voir étape 10).
+> **Après chaque redémarrage**, depuis votre compte :
+> ```
+> $ su - penny -c 'orb start'
+> ```
 
 ```
 $ su - penny
@@ -159,20 +163,26 @@ penny% ./scripts/install.sh
 ```
 Attendu : toutes les lignes en `ok`, puis `Prérequis OK.`
 
-## 10. Démarrage automatique de Docker et d'Ollama pour `penny`
+## 10. Démarrage automatique d'Ollama pour `penny`
 
 **Principe.** `penny` n'ouvre jamais de session graphique : un LaunchAgent ne se lancerait pas.
-On installe deux **LaunchDaemons système** qui tournent sous l'identité `penny` (clé `UserName`) :
+On installe un **LaunchDaemon système** qui tourne sous l'identité `penny` (clé `UserName`) :
 
 | Service | Lance | Comportement |
 |---|---|---|
-| `local.penny.orbstack` | `orb start` | une fois au démarrage ; les conteneurs reviennent grâce à `restart: unless-stopped` |
-| `local.penny.ollama` | `ollama serve` sur `127.0.0.1:11435` | relancé automatiquement s'il s'arrête |
+| `local.penny.ollama` | `ollama serve` sur `127.0.0.1:11435` | au démarrage, relancé automatiquement s'il s'arrête |
 
-Avec FileVault, ils démarrent après le déverrouillage du disque (votre mot de passe au démarrage).
+Avec FileVault, il démarre après le déverrouillage du disque (votre mot de passe au démarrage).
 
-**Sécurité.** Les plists sont posés en `root:wheel 644` dans `/Library/LaunchDaemons`.
-Le script refuse tout binaire que `penny` pourrait modifier, et les plists n'appellent
+**Pourquoi pas Docker.** Testé le 08/11/2026 : OrbStack lancé par launchd échoue au démarrage
+à froid (`missing TCC permission for data storage directory`). Ses données sont dans
+`~/Library/Group Containers`, protégé par TCC, et l'autorisation de l'étape 6 ne vaut pas pour
+launchd (même cas : issue OrbStack #2580, sans contournement). Le Mac sert au développement ;
+le service 24 h/24 sera assuré par le PC Linux, où systemd démarre Docker nativement. On
+accepte donc un `orb start` manuel après chaque redémarrage (étape 7).
+
+**Sécurité.** Le plist est posé en `root:wheel 644` dans `/Library/LaunchDaemons`.
+Le script refuse tout binaire que `penny` pourrait modifier, et le plist n'appelle
 **aucun script du dépôt**. Sinon `penny` pourrait réécrire ce que launchd exécute.
 
 **Installation**, depuis **votre** compte (administrateur), dans votre copie du dépôt :
@@ -183,12 +193,12 @@ $ git pull
 $ cp -n config/machine.example.env config/machine.env   # si absent
 $ sudo ./scripts/mac/install-services.sh
 ```
-Le script trouve seul `orb` et `ollama` dans les emplacements connus (appli dans
-`/Applications`, Homebrew). En cas d'échec, renseigner `PENNY_ORB_BIN` ou `PENNY_OLLAMA_BIN`
-dans `config/machine.env` (chemin donné par `ls -l $(which orb)`).
+Le script trouve seul `ollama` dans les emplacements connus (appli dans `/Applications`,
+Homebrew). En cas d'échec, renseigner `PENNY_OLLAMA_BIN` dans `config/machine.env`.
+Il retire aussi l'ancien service `local.penny.orbstack` s'il est encore installé.
 
-Attendu : les deux binaires `non modifiable par penny`, deux lignes `root:wheel 644`,
-`installé, chargé`, puis `Ollama répond sur 127.0.0.1:11435`.
+Attendu : `non modifiable par penny`, une ligne `root:wheel 644`, `installé, chargé`,
+puis `Ollama répond sur 127.0.0.1:11435`.
 
 État à tout moment : `./scripts/mac/install-services.sh --status`.
 Journaux : `/Users/penny/Library/Logs/penny/` (lisibles par `penny` seulement).
@@ -196,24 +206,22 @@ Désinstallation : `sudo ./scripts/mac/install-services.sh --uninstall`.
 
 ### Tests
 
-À faire dans l'ordre. Noter chaque résultat (réussi / échoué) dans le tableau « Constats ».
+À faire dans l'ordre, **une commande à la fois** (un bloc collé derrière `sudo` ou `su` est avalé).
 
-1. **Redémarrage** : redémarrer le Mac, déverrouiller, ouvrir **votre** session, **sans `su`** :
+1. **Redémarrage à froid** — testé OK le 08/11 : redémarrer, déverrouiller, ouvrir **votre**
+   session, **sans `su`** :
    ```
    $ curl -s http://127.0.0.1:11435/api/version; echo
    $ sudo lsof -nP -iTCP:11435 -sTCP:LISTEN
-   $ su - penny -c "docker version --format '{{.Server.Version}}'"
-   $ sudo cat /Users/penny/Library/Logs/penny/orbstack.log
    ```
-   Attendu : `{"version":"0.40.5"}` ; `ollama … penny … 127.0.0.1:11435`, **jamais** `*:11435` ;
-   version de Docker affichée **sans avoir lancé `orb start`**.
-   > Si le journal d'OrbStack contient `missing TCC permission`, l'autorisation de l'étape 6
-   > ne s'applique pas aux daemons : **c'est le risque principal, à signaler**.
+   Attendu : `{"version":"0.40.5"}` ; `ollama … penny … 127.0.0.1:11435`, **jamais** `*:11435`.
+   > Un service n'est validé qu'après un vrai redémarrage : avant, il peut sembler marcher
+   > parce que le programme tournait déjà.
 2. **Relance d'Ollama** : `sudo pkill -u penny -f "ollama serve"`, attendre 15 s, relancer le `curl` → répond.
 3. **Votre Ollama intact** : `curl -s http://127.0.0.1:11434/api/version` répond toujours.
-4. **Plists non modifiables par penny** (doit **échouer**) :
+4. **Plist non modifiable par penny** (doit **échouer**) :
    ```
-   $ su - penny -c 'touch /Library/LaunchDaemons/local.penny.ollama.plist'
+   $ sudo -u penny touch /Library/LaunchDaemons/local.penny.ollama.plist
    ```
    Attendu : `Permission denied`.
 5. **Garde-fou du script** (doit **échouer**) : `./scripts/mac/install-services.sh` sans `sudo`
@@ -224,7 +232,7 @@ Désinstallation : `sudo ./scripts/mac/install-services.sh --uninstall`.
 
 Rien de spécifique à Penny à installer : Ollama tourne dans Compose (`compose.yaml`),
 systemd démarre Docker (`systemctl enable docker`) et la politique `restart: unless-stopped`
-relance tous les conteneurs. Ces LaunchDaemons disparaissent à la migration.
+relance tous les conteneurs. Ce LaunchDaemon disparaît à la migration.
 
 ---
 
@@ -238,7 +246,8 @@ relance tous les conteneurs. Ces LaunchDaemons disparaissent à la migration.
 | Un second `su - penny` se lance tout seul | Plusieurs lignes collées d'un coup après un `su` | Coller ligne par ligne ; `exit` jusqu'à retrouver votre invite |
 | `zsh: you have running jobs` | Ollama lancé en tâche de fond | `disown` puis `exit` |
 | Écran « Docker / Kubernetes / Linux » | Premier lancement d'OrbStack | Choisir Docker |
-| `orb introuvable … /opt/homebrew/bin/orb` | OrbStack installé depuis l'appli : `orb` est dans `/Applications/OrbStack.app` | Corrigé : détection automatique (sinon `PENNY_ORB_BIN`) |
+| `vmgr … missing TCC permission for data storage directory` au démarrage | OrbStack lancé par launchd (testé le 08/11) | Pas de démarrage automatique de Docker sur le Mac : `su - penny -c 'orb start'` |
+| Un bloc de commandes collé derrière `sudo` n'affiche rien | La saisie du mot de passe avale les lignes suivantes | Une commande à la fois |
 
 ## Constats de sécurité (testés)
 
@@ -246,14 +255,16 @@ relance tous les conteneurs. Ces LaunchDaemons disparaissent à la migration.
 |---|---|
 | `penny` utilise le Docker du développeur | Refusé |
 | Docker de `penny` isolé dans `/Users/penny/.orbstack` | Oui |
-| Ollama de `penny` écoute sur le réseau | Non, 127.0.0.1 uniquement |
+| Ollama de `penny` écoute sur le réseau | Non, 127.0.0.1 uniquement (aussi lancé par launchd) |
+| Ollama de `penny` démarre seul après redémarrage | Oui (LaunchDaemon, 08/11) |
+| Docker de `penny` (OrbStack) démarre par launchd | **Non** : refus TCC au démarrage à froid |
 | Lecture croisée des dossiers personnels | Refusée dans les deux sens |
 | Ollama de `penny` joignable depuis votre compte | **Oui** : 127.0.0.1 n'isole pas les comptes d'un même Mac → la base et le serveur MCP de Penny exigeront une authentification même en local |
 
 ## Limites du prototype
 
-- Après un redémarrage, FileVault bloque tout jusqu'à la saisie d'un mot de passe ; les
-  services de l'étape 10 démarrent ensuite seuls.
+- Après un redémarrage, FileVault bloque tout jusqu'à la saisie d'un mot de passe ; Ollama
+  démarre ensuite seul, **Docker non** : `su - penny -c 'orb start'` (étape 7).
 - Mac en veille = Penny à l'arrêt (rappels de secours via ntfy sur le VPS).
 - OrbStack sans interface graphique ne se met pas à jour seul : mise à jour volontaire avec
   `brew upgrade --greedy orbstack`, ce qui convient aux versions figées.
