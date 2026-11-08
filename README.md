@@ -9,7 +9,8 @@ Assistant personnel local : seconde mémoire, suivi des engagements, anticipatio
 | Dossier | Rôle |
 |---|---|
 | `config/` | Configuration par machine, **sans secret** (`machine.example.env` à copier) |
-| `scripts/` | `install.sh` : seul point d'entrée d'installation |
+| `scripts/` | `install.sh` : point d'entrée d'installation (compte `penny`) ; `mac/install-services.sh` : partie administrateur du profil mac (démarrage automatique) |
+| `deploy/` | Fichiers système par profil (`mac/launchd/` : modèles des LaunchDaemons) |
 | `src/` | Code de Penny (Core, serveur MCP, circuit d'action) |
 | `tests/fixtures/` | Jeu de test inventé, en français, avec réponses attendues |
 | `docs/` | Décisions, notes techniques et tutoriels (`installation-mac.md`) |
@@ -22,3 +23,17 @@ cp config/machine.example.env config/machine.env   # puis ajuster
 ```
 
 Les secrets ne sont jamais dans ce dépôt : voir `CLAUDE.md`.
+
+## Portabilité (Mac prototype → PC IA Linux)
+
+Tout doit pouvoir être reconstruit sur une autre machine depuis ce dépôt et la sauvegarde.
+Ce qui diffère d'un profil à l'autre est isolé ici :
+
+| Besoin | `mac` (prototype) | `linux-gpu` (cible) |
+|---|---|---|
+| Inférence | Ollama natif (Metal), hors Docker | Ollama en conteneur (Compose) |
+| Démarrage automatique | LaunchDaemons `local.penny.*` (`scripts/mac/install-services.sh`) | systemd démarre Docker, Compose relance tout |
+| Isolation | compte macOS standard `penny`, FileVault | compte système `penny`, disque chiffré |
+| Secrets | trousseau macOS | coffre chiffré (à choisir) |
+
+Migration = installer le profil cible, copier `config/machine.env` en l'adaptant, restaurer la sauvegarde.

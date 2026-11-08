@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Ollama de Penny, lancé au démarrage (après déverrouillage FileVault) sous le compte penny.
+  Modèle complété par scripts/mac/install-services.sh. AUCUN SECRET ICI.
+  Installé dans /Library/LaunchDaemons en root:wheel 644 : penny ne peut pas le modifier.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>local.penny.ollama</string>
+
+  <key>UserName</key>
+  <string>penny</string>
+  <key>GroupName</key>
+  <string>staff</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>@OLLAMA_BIN@</string>
+    <string>serve</string>
+  </array>
+
+  <!-- launchd ne lit pas les profils du shell : tout l'environnement est ici. -->
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HOME</key>
+    <string>@PENNY_HOME@</string>
+    <key>USER</key>
+    <string>penny</string>
+    <key>OLLAMA_HOST</key>
+    <string>@OLLAMA_HOST@</string>
+  </dict>
+
+  <key>WorkingDirectory</key>
+  <string>@PENNY_HOME@</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+  <!-- Relancé s'il s'arrête, au plus une fois toutes les 10 s. -->
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+
+  <key>ProcessType</key>
+  <string>Background</string>
+
+  <key>StandardOutPath</key>
+  <string>@LOG_DIR@/ollama.log</string>
+  <key>StandardErrorPath</key>
+  <string>@LOG_DIR@/ollama.log</string>
+</dict>
+</plist>

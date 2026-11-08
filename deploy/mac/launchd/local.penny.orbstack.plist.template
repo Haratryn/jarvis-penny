@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Docker de Penny (OrbStack), démarré une fois au démarrage du Mac sous le compte penny.
+  Modèle complété par scripts/mac/install-services.sh. AUCUN SECRET ICI.
+  Installé dans /Library/LaunchDaemons en root:wheel 644 : penny ne peut pas le modifier.
+
+  `orb start` lance le moteur en arrière-plan puis rend la main. Sans AbandonProcessGroup,
+  launchd tuerait le moteur à la fin de la commande.
+  Les conteneurs reviennent ensuite seuls grâce à `restart: unless-stopped` (compose.yaml).
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>local.penny.orbstack</string>
+
+  <key>UserName</key>
+  <string>penny</string>
+  <key>GroupName</key>
+  <string>staff</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>@ORB_BIN@</string>
+    <string>start</string>
+  </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HOME</key>
+    <string>@PENNY_HOME@</string>
+    <key>USER</key>
+    <string>penny</string>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+
+  <key>WorkingDirectory</key>
+  <string>@PENNY_HOME@</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <false/>
+  <key>AbandonProcessGroup</key>
+  <true/>
+
+  <key>ProcessType</key>
+  <string>Background</string>
+
+  <key>StandardOutPath</key>
+  <string>@LOG_DIR@/orbstack.log</string>
+  <key>StandardErrorPath</key>
+  <string>@LOG_DIR@/orbstack.log</string>
+</dict>
+</plist>
