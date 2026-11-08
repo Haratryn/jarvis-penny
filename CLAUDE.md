@@ -18,6 +18,9 @@ et « Jarvis — revue contradictoire » (Claude Docs). « Jarvis » était le n
 4. **Versions figées partout** : images Docker par tag précis (idéalement digest), modèles
    par tag, dépendances par fichier de verrouillage.
 5. **Services sur 127.0.0.1 uniquement.** Bases de données et API de modèles jamais exposées.
+   127.0.0.1 est privé vis-à-vis du réseau, **pas vis-à-vis des autres comptes du Mac** :
+   la base de Penny et le serveur MCP exigent une authentification même en local.
+   Seul Ollama (aucune donnée, uniquement des modèles) en est dispensé.
 6. **Composants éprouvés plutôt que sécurité maison** (authentification, chiffrement, jetons).
 
 ## Architecture à respecter

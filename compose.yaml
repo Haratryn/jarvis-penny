@@ -10,7 +10,7 @@
 services:
   ollama:
     profiles: ["linux-gpu"]
-    image: ollama/ollama:0.30.7   # même version que sur le Mac ; à vérifier au passage sur la cible
+    image: ollama/ollama:0.40.5   # même version que sur le Mac (testée le 08/11/2026)
     ports:
       - "127.0.0.1:11434:11434"
     volumes:

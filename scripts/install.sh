@@ -24,6 +24,8 @@ command -v docker >/dev/null && ok "docker" || fail "docker absent"
 case "$PENNY_PROFILE" in
   mac)
     fdesetup status 2>/dev/null | grep -q "FileVault is On" && ok "FileVault" || fail "FileVault inactif"
+    [[ "$(stat -f %Lp "$HOME")" == "700" ]] && ok "dossier personnel en 700" || fail "dossier personnel lisible par d'autres comptes (chmod 700 ~)"
+    docker context inspect --format '{{.Endpoints.docker.Host}}' 2>/dev/null | grep -q "^unix://$HOME/" && ok "Docker propre au compte" || fail "le contexte Docker ne pointe pas vers le Docker de $(id -un)"
     curl -fsS "${PENNY_OLLAMA_URL}/api/version" >/dev/null && ok "Ollama natif joignable" || fail "Ollama natif injoignable sur ${PENNY_OLLAMA_URL}"
     ;;
   linux-gpu)
