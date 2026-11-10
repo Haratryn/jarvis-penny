@@ -1,0 +1,34 @@
+Message-ID: <m004@vie-inventee.example.com>
+Date: Wed, 14 Jan 2026 09:30:00 +0100
+From: Mutuelle Horizon <service-client@mutuelle-horizon.example.com>
+To: Julien Marchal <julien.marchal@perso.example.com>
+Subject: Rapport d'expertise =?utf-8?b?4oCT?= dossier SIN-2025-11873
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="==penny-m004=="
+
+--==penny-m004==
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: quoted-printable
+
+Bonjour,
+Vous trouverez ci-joint le rapport d'expertise. Les dommages retenus s'=C3=A9=
+l=C3=A8vent =C3=A0 1 840 =E2=82=AC, franchise de 150 =E2=82=AC d=C3=A9duite.
+Mutuelle Horizon
+
+--==penny-m004==
+Content-Type: text/markdown
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment;
+ filename="rapport-expertise-SIN-2025-11873.md"
+MIME-Version: 1.0
+
+IyBSYXBwb3J0IGQnZXhwZXJ0aXNlIOKAlCBkb3NzaWVyIFNJTi0yMDI1LTExODczCgpBc3N1csOp
+IDogSnVsaWVuIE1hcmNoYWwg4oCUIGNvbnRyYXQgaGFiaXRhdGlvbiBILTQ0ODgxMgpOYXR1cmUg
+ZHUgc2luaXN0cmUgOiBkw6lnw6J0IGRlcyBlYXV4IChmdWl0ZSBkdSBzaXBob24gc291cyBsJ8Op
+dmllciBkZSBsYSBjdWlzaW5lKQpEYXRlIGRlIHN1cnZlbmFuY2UgOiAwMy8xMi8yMDI1CkRhdGUg
+ZGUgZMOpY2xhcmF0aW9uIDogMDUvMTIvMjAyNQpEYXRlIGRlIGwnZXhwZXJ0aXNlIDogMDkvMDEv
+MjAyNgpEb21tYWdlcyByZXRlbnVzIDogcGFycXVldCBkZSBsYSBjdWlzaW5lLCBiYXMgZHUgbWV1
+YmxlIGQnw6l2aWVyIOKAlCAxIDg0MCwwMCDigqwKRnJhbmNoaXNlIGNvbnRyYWN0dWVsbGUgOiAx
+NTAsMDAg4oKsCkluZGVtbml0w6kgcHJvcG9zw6llIDogMSA2OTAsMDAg4oKsCg==
+
+--==penny-m004==--

@@ -1,0 +1,32 @@
+Message-ID: <m016@vie-inventee.example.com>
+Date: Mon, 02 Nov 2026 08:00:00 +0100
+From: Mutuelle Horizon <service-client@mutuelle-horizon.example.com>
+To: Julien Marchal <julien.marchal@perso.example.com>
+Subject: Avis =?utf-8?b?ZCfDqWNow6lhbmNlIDIwMjcg4oCT?= contrat auto A-207734
+ (Renault =?utf-8?q?M=C3=A9gane?= E-Tech)
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="==penny-m016=="
+
+--==penny-m016==
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+
+Bonjour,
+Votre contrat automobile A-207734 sera reconduit le 1er janvier 2027.
+Cotisation annuelle : 612,40 €. Votre avis d'échéance est joint.
+Mutuelle Horizon
+
+--==penny-m016==
+Content-Type: text/markdown
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="avis-echeance-auto-2027.md"
+MIME-Version: 1.0
+
+IyBNdXR1ZWxsZSBIb3Jpem9uIOKAlCBBdmlzIGQnw6ljaMOpYW5jZSAyMDI3CgpDb250cmF0IGF1
+dG9tb2JpbGUgbsKwIEEtMjA3NzM0ClbDqWhpY3VsZSA6IFJlbmF1bHQgTcOpZ2FuZSBFLVRlY2gs
+IGltbWF0cmljdWxhdGlvbiBBQi0xMjMtQ0QKRGF0ZSBkJ8OpY2jDqWFuY2UgOiAxZXIgamFudmll
+ciAyMDI3IChyZWNvbmR1Y3Rpb24gdGFjaXRlKQpDb3Rpc2F0aW9uIGFubnVlbGxlIFRUQyA6IDYx
+Miw0MCDigqwKUHLDqWzDqHZlbWVudCA6IDEwIG1lbnN1YWxpdMOpcyDDoCBwYXJ0aXIgZGUgamFu
+dmllciAyMDI3Cg==
+
+--==penny-m016==--

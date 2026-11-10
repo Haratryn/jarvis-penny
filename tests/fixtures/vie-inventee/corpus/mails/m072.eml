@@ -1,0 +1,28 @@
+Message-ID: <m072@vie-inventee.example.com>
+Date: Sat, 07 Nov 2026 16:45:00 +0100
+From: Julien Marchal <j.marchal@altimea.example.com>
+To: Antoine Dubreuil <a.dubreuil@altimea.example.com>
+Subject: Re: Note de cadrage =?utf-8?q?H=C3=A9lios?=
+In-Reply-To: <m071@vie-inventee.example.com>
+References: <m071@vie-inventee.example.com>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="==penny-m072=="
+
+--==penny-m072==
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+
+Voici la note de cadrage Hélios (v1) en pièce jointe.
+
+--==penny-m072==
+Content-Type: text/markdown
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="note-cadrage-helios-v1.md"
+MIME-Version: 1.0
+
+IyBQcm9qZXQgSMOpbGlvcyDigJQgTm90ZSBkZSBjYWRyYWdlICh2MSkKCkF1dGV1ciA6IEp1bGll
+biBNYXJjaGFsIOKAlCAwNy8xMS8yMDI2Ck9iamV0IDogcmVmb250ZSBkZSBsJ291dGlsIGRlIHN1
+aXZpIGRlcyBpbnRlcnZlbnRpb25zCkphbG9ucyA6IGNvbWl0w6kgZGUgcGlsb3RhZ2UgbGUgMDMv
+MTIvMjAyNiwgbWFxdWV0dGUgZW4gamFudmllciAyMDI3Cg==
+
+--==penny-m072==--

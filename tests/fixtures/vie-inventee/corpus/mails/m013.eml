@@ -1,0 +1,31 @@
+Message-ID: <m013@vie-inventee.example.com>
+Date: Thu, 02 Jul 2026 17:40:00 +0200
+From: VitreAuto Villeneuve <atelier@vitreauto.example.com>
+To: Julien Marchal <julien.marchal@perso.example.com>
+Subject: Votre intervention du 2 juillet =?utf-8?b?4oCT?= facture
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="==penny-m013=="
+
+--==penny-m013==
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: quoted-printable
+
+Bonjour,
+Le pare-brise de votre M=C3=A9gane a =C3=A9t=C3=A9 remplac=C3=A9 ce jour. La =
+facture, r=C3=A9gl=C3=A9e par Mutuelle Horizon, est jointe.
+VitreAuto
+
+--==penny-m013==
+Content-Type: text/markdown
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="facture-vitreauto-2026-07-02.md"
+MIME-Version: 1.0
+
+IyBWaXRyZUF1dG8gVmlsbGVuZXV2ZSDigJQgRmFjdHVyZSBuwrAgVkEtMjYtMDcxNQoKRGF0ZSBk
+J2ludGVydmVudGlvbiA6IDAyLzA3LzIwMjYKVsOpaGljdWxlIDogUmVuYXVsdCBNw6lnYW5lIEUt
+VGVjaCwgQUItMTIzLUNEClByZXN0YXRpb24gOiByZW1wbGFjZW1lbnQgZHUgcGFyZS1icmlzZQpN
+b250YW50IDogMSAxMjAsMDAg4oKsIFRUQyDigJQgcsOpZ2zDqSBkaXJlY3RlbWVudCBwYXIgTXV0
+dWVsbGUgSG9yaXpvbiAoZG9zc2llciBTSU4tMjAyNi0wNDUyMSkKUmVzdGUgw6AgY2hhcmdlIDog
+MCwwMCDigqwK
+
+--==penny-m013==--
