@@ -234,6 +234,117 @@ Rien de spécifique à Penny à installer : Ollama tourne dans Compose (`compose
 systemd démarre Docker (`systemctl enable docker`) et la politique `restart: unless-stopped`
 relance tous les conteneurs. Ce LaunchDaemon disparaît à la migration.
 
+## 11. Penny, incrément 1 : analyser un dossier OneDrive (lecture seule)
+
+**Ce que fait cette version.** Penny inventorie un dossier de votre OneDrive, en télécharge une
+copie **sous le compte `penny`**, en extrait le texte et une fiche par document **avec le modèle
+local**, puis répond à vos questions en citant ses sources. Rien n'est modifié dans OneDrive : le
+jeton Microsoft ne donne que des droits de lecture.
+
+**Séparation avec Claude (règle).** Les données réelles n'existent que sous `/Users/penny`.
+Claude Code tourne sous votre compte : macOS l'empêche de les lire. Ne jamais lancer Claude Code
+sous `penny`. La seule sortie à transmettre à Claude est `penny diag` (compteurs, sans aucun nom
+de fichier ni contenu). Un problème sur un vrai document se reproduit avec un document inventé.
+
+### 11.1 Outils (votre compte)
+
+```
+$ brew install uv rclone
+```
+
+### 11.2 Déployer Penny
+
+Depuis votre copie du dépôt, à jour et sans modification en cours :
+```
+$ cd ~/GIT/penny && git pull
+```
+```
+$ sudo ./scripts/mac/deploy-penny.sh
+```
+Attendu : `Penny <commit> installée dans /opt/penny/releases/…`, la configuration de `penny`
+créée, puis `bge-m3 : prêt` et `qwen3:8b : prêt`. Le premier déploiement télécharge Python,
+les dépendances et les modèles : compter plusieurs minutes.
+
+Vérification :
+```
+$ ls -ld /opt/penny/current/
+$ su - penny -c 'penny status'
+```
+Attendu : propriétaire `root wheel` ; `Aucun dossier analysé.`
+
+### 11.3 Connecter OneDrive en lecture seule
+
+```
+$ su - penny
+penny% penny onedrive connect
+```
+Penny lance l'assistant de rclone et rappelle les réponses à donner :
+- nom `penny-onedrive`, stockage `onedrive`, `client_id` et `client_secret` vides ;
+- options avancées : `access_scopes` = `Files.Read offline_access`
+  (si refusé : « Read only access to all resources ») ;
+- authentification par navigateur : **non**. rclone affiche une commande
+  `rclone authorize "onedrive" …` : la copier, l'exécuter **dans un autre terminal de votre
+  compte** ; le navigateur s'ouvre. **Vérifier que Microsoft n'affiche que des droits de
+  lecture**, accepter, puis coller le jeton dans le terminal de `penny` ;
+- choisir **OneDrive personnel** ;
+- enfin `s) Set configuration password` : choisir un mot de passe (configuration chiffrée).
+
+Option : ranger ce mot de passe dans le trousseau de `penny` pour ne pas le saisir à chaque fois.
+```
+penny% security add-generic-password -a penny -s penny-rclone -w
+```
+puis décommenter `PENNY_RCLONE_PASSWORD_COMMAND` dans `~/.config/penny/penny.env`.
+> **À tester** : via `su`, le trousseau de `penny` peut être verrouillé. Si Penny affiche
+> « trousseau verrouillé », lancer `security unlock-keychain` (mot de passe de `penny`), ou
+> laisser la ligne commentée et saisir le mot de passe à chaque lancement.
+
+```
+penny% penny onedrive check
+```
+Attendu : l'espace utilisé et total, puis `Accès OneDrive : OK`.
+
+### 11.4 Premier passage
+
+**Avant de lancer** : écrire pour vous seul (pas dans le dépôt, pas à Claude) **10 questions** dont
+vous connaissez la réponse dans ce dossier, dont **2 sans réponse**. C'est le critère de réussite.
+
+```
+penny% penny scan "Chemin/Du/Dossier" --limit 50
+penny% penny status
+```
+- L'inventaire complet s'affiche tout de suite ; 50 fichiers au plus sont analysés à chaque passage.
+  Relancer la même commande pour continuer (ou sans `--limit` pour tout faire).
+- `Ctrl-C` à tout moment : la commande suivante reprend où elle s'était arrêtée.
+- Le premier PDF déclenche le téléchargement des modèles de Docling (une fois).
+- `penny status` indique combien de fichiers sont **sans texte** (scans, photos) : ils sont listés,
+  en attente d'OCR (incrément ultérieur).
+
+### 11.5 Utiliser
+
+```
+penny% penny docs                       # inventaire : date, type, titre, personnes, chemin
+penny% penny docs --type facture
+penny% penny docs --sans-texte          # scans et photos non lus
+penny% penny ask "Où est mon attestation d'assurance habitation ?"
+penny% penny diag                       # rapport anonymisé, le seul à transmettre à Claude
+```
+Chaque réponse cite ses sources (`[1]`, `[2]`… avec le chemin OneDrive) et rappelle le périmètre :
+« N documents analysés sur M ». Une citation qui ne correspond à aucun extrait retrouvé est retirée.
+
+### 11.6 Critère de réussite de l'incrément 1
+
+| Test | Attendu |
+|---|---|
+| Inventaire | même nombre de fichiers que OneDrive pour ce dossier ; chacun a un statut |
+| 10 questions | au moins 8 bonnes avec la bonne source ; aucune source inventée |
+| 2 questions sans réponse | « Je n'ai pas trouvé… » et rappel du périmètre |
+| Relance de `penny scan` | `0 analysés` : rien n'est refait |
+| Interruption (`Ctrl-C`) puis relance | reprise sans tout refaire |
+| `penny diag` | aucun nom de fichier ni contenu |
+| Temps | relevés par `penny diag` (non bloquant) |
+
+Bilan à noter : score sur 10, temps moyen par document et par question, limites constatées.
+
 ---
 
 ## Pièges rencontrés

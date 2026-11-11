@@ -1,0 +1,35 @@
+[project]
+name = "penny"
+version = "0.1.0"
+description = "Penny — seconde mémoire locale (incrément 1 : analyse d'un dossier OneDrive)"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "numpy>=2.1,<3",
+]
+
+[project.optional-dependencies]
+# Extraction des PDF, Word, Excel, PowerPoint. Lourd (modèles) : installé sur le Mac,
+# inutile pour les tests (qui utilisent un extracteur de remplacement).
+extract = [
+    "docling>=2.40,<3",
+]
+
+[project.scripts]
+penny = "penny.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8,<9",
+]
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/penny"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["tests"]
+addopts = "-q"

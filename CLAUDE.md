@@ -7,9 +7,14 @@ et « Jarvis — revue contradictoire » (Claude Docs). « Jarvis » était le n
 
 ## Règles absolues
 
-1. **Fausses données uniquement.** Aucun vrai mail, agenda, document ou contact ne passe
-   dans une session Claude Code. Les tests utilisent `tests/fixtures/` (données inventées).
-   Si une tâche semble exiger de vraies données, s'arrêter et demander.
+1. **Penny voit les données réelles, Claude jamais.** Penny tourne sous le compte `penny` et
+   ses données vivent sous `/Users/penny` (700) ; Claude Code tourne sous le compte du
+   développeur et ne peut pas les lire. Claude Code développe et teste uniquement sur des
+   données inventées (`tests/fixtures/`, faux OneDrive des tests). La seule sortie de Penny
+   transmissible à Claude est `penny diag` (compteurs, sans nom de fichier ni contenu). Ne
+   jamais demander à l'utilisateur de coller un vrai document, nom de fichier, chemin, réponse
+   ou journal ; un problème réel se reproduit avec un document inventé. Si une tâche semble
+   exiger de vraies données, s'arrêter et demander.
 2. **Aucun secret dans Git, les prompts, les logs ou la mémoire.** Les secrets passent par
    la couche `secrets` (trousseau macOS sur Mac, coffre chiffré sur Linux). Jamais en clair
    dans un fichier de config, une variable d'environnement commitée ou un exemple.
