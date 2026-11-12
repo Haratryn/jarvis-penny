@@ -73,18 +73,39 @@ PENNY_HOME="$(dscl . -read "/Users/$SERVICE_USER" NFSHomeDirectory | awk '{print
 CONF_DIR="$PENNY_HOME/.config/penny"
 as_penny mkdir -p "$CONF_DIR"
 as_penny chmod 700 "$PENNY_HOME/.config" "$CONF_DIR"
-if [[ ! -f "$CONF_DIR/penny.env" ]]; then
-  sed "s|^PENNY_RCLONE_BIN=.*|PENNY_RCLONE_BIN=$RCLONE|" config/penny.example.env | as_penny tee "$CONF_DIR/penny.env" >/dev/null
-  info "créée : $CONF_DIR/penny.env"
-else
-  info "conservée : $CONF_DIR/penny.env"
-fi
+CONF="$CONF_DIR/penny.env"
+[[ -f "$CONF" ]] || as_penny touch "$CONF"
+as_penny chmod 600 "$CONF"
+# Complète la configuration : toute clé absente ou vide reprend la valeur du modèle
+# (les valeurs déjà renseignées par l'utilisateur sont conservées).
+while IFS= read -r line; do
+  [[ "$line" =~ ^(PENNY_[A-Z_]+)=(.*)$ ]] || continue
+  key="${BASH_REMATCH[1]}"; value="${BASH_REMATCH[2]}"
+  [[ "$key" == "PENNY_RCLONE_BIN" ]] && value="$RCLONE"
+  if ! grep -qE "^${key}=.+" "$CONF"; then
+    tmp="$(mktemp)"
+    grep -vE "^${key}=" "$CONF" > "$tmp" || true
+    echo "${key}=${value}" >> "$tmp"
+    as_penny tee "$CONF" < "$tmp" >/dev/null
+    rm -f "$tmp"
+    info "configuration : $key=$value"
+  fi
+done < config/penny.example.env
+info "configuration : $CONF"
 
-echo "Modèles Ollama de $SERVICE_USER :"
-# shellcheck disable=SC2046
-eval $(grep -E '^PENNY_(LLM|EMBED)_MODEL=|^PENNY_OLLAMA_URL=' "$CONF_DIR/penny.env")
-HOSTPORT="${PENNY_OLLAMA_URL#http://}"
-for model in "$PENNY_EMBED_MODEL" "$PENNY_LLM_MODEL"; do
-  as_penny env OLLAMA_HOST="$HOSTPORT" "$OLLAMA" pull "$model" >/dev/null && info "$model : prêt"
+value_of() { grep -E "^$1=" "$CONF" | tail -1 | cut -d= -f2-; }
+LLM_MODEL="$(value_of PENNY_LLM_MODEL)"
+EMBED_MODEL="$(value_of PENNY_EMBED_MODEL)"
+OLLAMA_URL="$(value_of PENNY_OLLAMA_URL)"
+[[ -n "$LLM_MODEL" && -n "$EMBED_MODEL" && -n "$OLLAMA_URL" ]] || die "configuration incomplète : $CONF"
+[[ -x "$(value_of PENNY_RCLONE_BIN)" ]] || die "PENNY_RCLONE_BIN invalide dans $CONF"
+
+echo "Modèles Ollama de $SERVICE_USER (téléchargement si absent, peut être long) :"
+[[ -x "$OLLAMA" ]] || die "ollama introuvable : $OLLAMA"
+HOSTPORT="${OLLAMA_URL#http://}"
+curl -fsS "$OLLAMA_URL/api/version" >/dev/null || die "l'Ollama de $SERVICE_USER ne répond pas sur $OLLAMA_URL (étape 10)"
+for model in "$EMBED_MODEL" "$LLM_MODEL"; do
+  as_penny env OLLAMA_HOST="$HOSTPORT" "$OLLAMA" pull "$model" || die "téléchargement du modèle $model impossible"
+  info "$model : prêt"
 done
 echo "Terminé. Suite : docs/installation-mac.md, étape 11."
