@@ -156,12 +156,14 @@ $ curl -s http://127.0.0.1:11435/api/version; echo
 
 ## 9. Vérification globale
 
+> **Se fait après l'étape 11.** Il n'y a pas de copie du dépôt sous `penny` : Penny est
+> déployée par votre compte dans `/opt/penny` (étape 11.2), non modifiable par `penny`.
+
+Une fois l'étape 11.2 faite :
 ```
-$ su - penny
-penny% cd ~/penny && cp config/machine.example.env config/machine.env
-penny% ./scripts/install.sh
+$ su - penny -c /opt/penny/current/scripts/install.sh
 ```
-Attendu : toutes les lignes en `ok`, puis `Prérequis OK.`
+Attendu : toutes les lignes en `ok` (les lignes `info` sur Docker sont normales), puis `Prérequis OK.`
 
 ## 10. Démarrage automatique d'Ollama pour `penny`
 
@@ -268,9 +270,10 @@ les dépendances et les modèles : compter plusieurs minutes.
 Vérification :
 ```
 $ ls -ld /opt/penny/current/
+$ su - penny -c /opt/penny/current/scripts/install.sh
 $ su - penny -c 'penny status'
 ```
-Attendu : propriétaire `root wheel` ; `Aucun dossier analysé.`
+Attendu : propriétaire `root wheel` ; `Prérequis OK.` ; `Aucun dossier analysé.`
 
 ### 11.3 Connecter OneDrive en lecture seule
 
@@ -358,6 +361,7 @@ Bilan à noter : score sur 10, temps moyen par document et par question, limites
 | `zsh: you have running jobs` | Ollama lancé en tâche de fond | `disown` puis `exit` |
 | Écran « Docker / Kubernetes / Linux » | Premier lancement d'OrbStack | Choisir Docker |
 | `vmgr … missing TCC permission for data storage directory` au démarrage | OrbStack lancé par launchd (testé le 08/11) | Pas de démarrage automatique de Docker sur le Mac : `su - penny -c 'orb start'` |
+| Étape 9 : `~/penny` introuvable sous `penny` | Ancienne version du tutoriel (copie du dépôt jamais créée) | Penny est déployée dans `/opt/penny` (étape 11.2), puis vérification par `/opt/penny/current/scripts/install.sh` |
 | Un bloc de commandes collé derrière `sudo` n'affiche rien | La saisie du mot de passe avale les lignes suivantes | Une commande à la fois |
 
 ## Constats de sécurité (testés)

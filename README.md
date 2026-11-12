@@ -42,10 +42,8 @@ Développement : `uv sync --group dev && uv run pytest` (faux OneDrive, faux mod
 
 ## Installation
 
-```
-cp config/machine.example.env config/machine.env   # puis ajuster
-./scripts/install.sh
-```
+Tutoriel pas à pas : `docs/installation-mac.md`. Après déploiement, vérification des prérequis
+sous le compte `penny` : `su - penny -c /opt/penny/current/scripts/install.sh`.
 
 Les secrets ne sont jamais dans ce dépôt : voir `CLAUDE.md`.
 
