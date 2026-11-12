@@ -35,7 +35,7 @@ def test_limite_puis_reprise(env):
     rep = env.scanner.scan(ROOT, limit=3)
     assert rep.processed + rep.no_text + rep.skipped == 3 and rep.remaining == 6
     rep = env.scanner.scan(ROOT)
-    assert rep.remaining == 0 and len(env.source.downloads) == 9  # rien téléchargé deux fois
+    assert rep.remaining == 0 and len(env.source.downloads) == 7  # rien téléchargé deux fois
 
 
 def test_modification_renommage_disparition(env):
@@ -141,3 +141,12 @@ def test_erreur_inattendue_d_extraction_n_arrete_pas_le_scan(env):
     rep = env.scanner.scan(ROOT)
     assert rep.errors == 2 and rep.error_codes == {"ConnectionError": 2}
     assert rep.processed == 5
+
+
+def test_images_et_formats_non_pris_en_charge_ne_sont_pas_telecharges(env):
+    env.scanner.scan(ROOT)
+    assert "ID!107" not in env.source.downloads   # image
+    assert "ID!108" not in env.source.downloads   # zip
+    assert "ID!109" in env.source.downloads       # texte (vide, mais lisible)
+    reasons = dict(env.conn.execute("SELECT item_id, reason FROM processing").fetchall())
+    assert reasons["ID!107"] == "image" and reasons["ID!108"] == "format_non_pris_en_charge"

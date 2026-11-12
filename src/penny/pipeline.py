@@ -16,7 +16,7 @@ from pathlib import Path, PurePosixPath
 import numpy as np
 
 from . import db
-from .extract import Extractor, NoText, Unsupported
+from .extract import DOCLING_EXT, IMAGE_EXT, TEXT_EXT, Extractor, NoText, Unsupported
 from .llm import LLM, LLMError
 from .onedrive import RemoteFile, Source
 
@@ -166,6 +166,13 @@ class Scanner:
         state = proc["state"] if proc["state"] != "error" else (
             "extracted" if proc["md_path"] else "downloaded" if proc["local_path"] else "listed")
 
+        # Décidé sur l'extension, sans téléchargement : rien n'est copié inutilement.
+        if row["ext"] in IMAGE_EXT:
+            self._set_state(item_id, hash_, "no_text", "image")
+            return "no_text"
+        if row["ext"] not in TEXT_EXT | DOCLING_EXT:
+            self._set_state(item_id, hash_, "skipped", "format_non_pris_en_charge")
+            return "skipped"
         if row["size"] > self.max_bytes:
             self._set_state(item_id, hash_, "skipped", "trop_volumineux")
             return "skipped"
