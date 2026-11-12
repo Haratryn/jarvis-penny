@@ -2,6 +2,7 @@
 config/machine.env
 *.env
 !config/machine.example.env
+!config/penny.example.env
 *.key
 *.pem
 secrets/
