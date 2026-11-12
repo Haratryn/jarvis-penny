@@ -30,8 +30,15 @@ cd "$REPO_DIR"
 [[ -z "$(as_dev git status --porcelain)" ]] || die "le dépôt a des modifications non commitées : commiter ou annuler avant de déployer"
 COMMIT="$(as_dev git rev-parse --short=12 HEAD)"
 
-UV="$(as_dev /bin/bash -lc 'command -v uv' || true)"
-RCLONE="$(as_dev /bin/bash -lc 'command -v rclone' || true)"
+# Emplacements Homebrew (Apple Silicon, puis Intel) : on ne dépend pas des fichiers de shell.
+find_tool() {
+  local c
+  for c in "/opt/homebrew/bin/$1" "/usr/local/bin/$1"; do
+    [[ -x "$c" ]] && { echo "$c"; return; }
+  done
+}
+UV="$(find_tool uv)"
+RCLONE="$(find_tool rclone)"
 OLLAMA="/usr/local/bin/ollama"
 [[ -x "$UV" ]] || die "uv absent : brew install uv (depuis votre compte)"
 [[ -x "$RCLONE" ]] || die "rclone absent : brew install rclone (depuis votre compte)"
