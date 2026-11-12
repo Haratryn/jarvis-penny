@@ -17,6 +17,8 @@ def test_fichiers_utilises_par_les_scripts_sont_versionnes():
     for script in ("scripts/mac/deploy-penny.sh", "scripts/mac/install-services.sh"):
         for ref in re.findall(r"\b((?:config|deploy|scripts)/[\w./-]+\.(?:env|template|sh))\b",
                               (ROOT / script).read_text()):
+            if ref.endswith(".env") and ".example." not in ref:
+                continue  # configuration locale, volontairement hors du dépôt
             assert ref in files, f"{script} utilise {ref}, absent du dépôt (gitignore ?)"
 
 
