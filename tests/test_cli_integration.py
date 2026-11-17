@@ -104,7 +104,9 @@ def test_parcours_complet(cli_env, capsys):
 
 def test_refus_hors_compte_penny(monkeypatch):
     monkeypatch.delenv("PENNY_ALLOW_ANY_USER", raising=False)
-    monkeypatch.setattr(cli.getpass, "getuser", lambda: "julien")
+    monkeypatch.setattr(cli, "current_account", lambda: "julien")
+    monkeypatch.setenv("USER", "penny")      # des variables trompeuses ne suffisent pas
+    monkeypatch.setenv("LOGNAME", "penny")
     with pytest.raises(SystemExit) as exc:
         cli.main(["status"])
     assert "penny" in str(exc.value)

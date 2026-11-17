@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 import argparse
-import getpass
 import os
+import pwd
 import subprocess
 import sys
 
@@ -20,9 +20,17 @@ from .search import Searcher, cards_listing
 READONLY_SCOPES = "Files.Read offline_access"
 
 
+def current_account() -> str:
+    """Compte réel du processus (identifiant effectif), pas les variables USER/LOGNAME,
+    qu'un su peut laisser au nom de l'appelant et que n'importe qui peut modifier."""
+    return pwd.getpwuid(os.geteuid()).pw_name
+
+
 def _guard_account() -> None:
-    if os.environ.get("PENNY_ALLOW_ANY_USER") != "1" and getpass.getuser() != "penny":
-        sys.exit("Penny doit tourner sous le compte « penny » (su - penny). "
+    account = current_account()
+    if os.environ.get("PENNY_ALLOW_ANY_USER") != "1" and account != "penny":
+        sys.exit(f"Penny doit tourner sous le compte « penny » (compte actuel : {account}). "
+                 "Lancer d'abord : su - penny. "
                  "C'est ce qui empêche les autres programmes, dont Claude, de lire ses données.")
 
 
