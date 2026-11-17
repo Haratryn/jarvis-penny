@@ -273,8 +273,10 @@ Vérification :
 $ ls -ld /opt/penny/current/
 $ su - penny -c /opt/penny/current/scripts/install.sh
 $ su - penny -c 'penny status'
+$ su - penny -c 'penny --version'
 ```
-Attendu : propriétaire `root wheel` ; `Prérequis OK.` ; `Aucun dossier analysé.`
+Attendu : propriétaire `root wheel` ; `Prérequis OK.` ; `Aucun dossier analysé.` ;
+le commit affiché par `--version` est celui de `git -C ~/GIT/penny log --oneline -1`.
 
 ### 11.3 Donner à `penny` l'accès aux seuls dossiers choisis
 
@@ -404,6 +406,7 @@ Bilan à noter : score sur 10, temps moyen par document et par question, limites
 | Étape 9 : `~/penny` introuvable sous `penny` | Ancienne version du tutoriel (copie du dépôt jamais créée) | Penny est déployée dans `/opt/penny` (étape 11.2), puis vérification par `/opt/penny/current/scripts/install.sh` |
 | `penny scan` : « ne peut pas lire ce dossier » | Nom différent, chemin pris depuis la mauvaise racine, ou niveau intermédiaire sans droit `search` | `penny onedrive check "<dossier>"` indique le niveau en cause |
 | Refus « Penny doit tourner sous le compte penny » alors qu'on est sous `su - penny` | Le garde-fou lisait `USER`/`LOGNAME` (corrigé le 18/11 : compte réel du processus) | Redéployer |
+| `penny: error: unrecognized arguments` sur une commande documentée | Ancienne version encore déployée | Comparer `penny --version` et `git log --oneline -1`, puis `git pull` et redéployer |
 | Un bloc de commandes collé derrière `sudo` n'affiche rien | La saisie du mot de passe avale les lignes suivantes | Une commande à la fois |
 
 ## Constats de sécurité (testés)

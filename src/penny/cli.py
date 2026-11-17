@@ -20,6 +20,16 @@ from .search import Searcher, cards_listing
 READONLY_SCOPES = "Files.Read offline_access"
 
 
+def installed_version() -> str:
+    """Version et commit déployé (dossier /opt/penny/releases/<commit>)."""
+    from pathlib import Path
+    from . import __version__
+    for part in Path(__file__).resolve().parts:
+        if len(part) == 12 and all(c in "0123456789abcdef" for c in part):
+            return f"{__version__} (commit {part})"
+    return f"{__version__} (développement)"
+
+
 def current_account() -> str:
     """Compte réel du processus (identifiant effectif), pas les variables USER/LOGNAME,
     qu'un su peut laisser au nom de l'appelant et que n'importe qui peut modifier."""
@@ -136,6 +146,7 @@ def cmd_diag(cfg: Config, args) -> None:
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="penny", description="Penny — seconde mémoire locale")
+    parser.add_argument("--version", action="version", version=f"penny {installed_version()}")
     sub = parser.add_subparsers(dest="cmd", required=True)
     od = sub.add_parser("onedrive", help="accès OneDrive (lecture seule)")
     od_sub = od.add_subparsers(dest="action", required=True)
