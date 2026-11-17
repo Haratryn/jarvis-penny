@@ -112,3 +112,23 @@ def test_cli_source_locale(local, monkeypatch, capsys):
     assert "Source : local" in capsys.readouterr().out
     with pytest.raises(SystemExit, match="aucune connexion"):
         cli.main(["onedrive", "connect"])
+
+
+def test_chemin_complet_accepte_s_il_est_sous_la_racine(local):
+    rep = local.scanner.scan(str(local.top))
+    assert rep.listed == 9
+    with pytest.raises(SourceError, match="pas sous la racine"):
+        local.source.list_files(str(local.tmp))
+
+
+def test_diagnostic_niveau_par_niveau(local):
+    rows = local.source.diagnose(ROOT + "/Absent")
+    assert [s for _, s in rows][:3] == ["ok : traversable et lisible"] * 3
+    assert "INTROUVABLE" in rows[-1][1]
+    os.chmod(local.top, 0o000)
+    try:
+        rows = local.source.diagnose(ROOT)
+        if os.geteuid() != 0:  # root passe outre les droits
+            assert "NON traversable" in rows[-1][1]
+    finally:
+        os.chmod(local.top, 0o755)

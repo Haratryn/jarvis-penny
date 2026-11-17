@@ -45,17 +45,55 @@ class LocalFolderSource:
         self.conn = conn
         self.max_bytes = max_file_mb * 1024 * 1024
 
-    def _root_dir(self, root: str) -> Path:
+    def relative(self, root: str) -> PurePosixPath:
+        """Dossier demandé, relatif à la racine OneDrive. Un chemin complet est accepté
+        s'il est sous la racine."""
         if not str(self.base) or str(self.base) == ".":
             raise SourceError("PENNY_LOCAL_ROOT n'est pas configuré")
-        rel = PurePosixPath(root.strip("/"))
-        if rel.is_absolute() or ".." in rel.parts:
-            raise SourceError("dossier refusé : il doit être relatif à PENNY_LOCAL_ROOT, sans « .. »")
-        path = self.base / rel
+        raw = PurePosixPath(os.path.expanduser(root.strip()))
+        if raw.is_absolute():
+            try:
+                raw = raw.relative_to(self.base)
+            except ValueError:
+                raise SourceError("chemin complet refusé : il n'est pas sous la racine OneDrive "
+                                  "(PENNY_LOCAL_ROOT)") from None
+        rel = PurePosixPath(str(raw).strip("/"))
+        if ".." in rel.parts:
+            raise SourceError("dossier refusé : « .. » interdit")
+        return rel
+
+    def _root_dir(self, root: str) -> Path:
+        path = self.base / self.relative(root)
         if not os.access(path, os.R_OK | os.X_OK) or not path.is_dir():
-            raise SourceError("Penny ne peut pas lire ce dossier : vérifier son nom et les droits "
-                              "accordés à penny (tutoriel, étape 11.3)")
+            raise SourceError("Penny ne peut pas lire ce dossier. Diagnostic niveau par niveau : "
+                              f"penny onedrive check \"{root}\"")
         return path
+
+    def diagnose(self, root: str) -> list[tuple[str, str]]:
+        """État de chaque niveau du chemin, vu par penny (affiché localement uniquement)."""
+        rows = []
+        path = self.base
+        parts = [("racine OneDrive", path)]
+        for part in self.relative(root).parts:
+            path = path / part
+            parts.append((part, path))
+        for label, p in parts:
+            try:
+                p.stat()
+            except FileNotFoundError:
+                rows.append((label, "INTROUVABLE (nom différent ?)"))
+                break
+            except PermissionError:
+                rows.append((label, "BLOQUÉ : le niveau au-dessus n'est pas traversable (droit search)"))
+                break
+            can_x, can_r = os.access(p, os.X_OK), os.access(p, os.R_OK)
+            if not p.is_dir():
+                rows.append((label, "n'est pas un dossier"))
+                break
+            rows.append((label, "ok : traversable et lisible" if can_x and can_r
+                         else "traversable seulement (search)" if can_x
+                         else "NON traversable (manque le droit search)"))
+        return rows
 
     def _hash(self, path: Path, ext: str, size: int, mtime: str) -> str:
         if ext in TEXT_EXT | DOCLING_EXT and size <= self.max_bytes:

@@ -311,6 +311,15 @@ $ su - penny -c 'penny onedrive check'
 $ su - penny -c 'find "<dossier>" -type f | wc -l'
 ```
 Attendu : `Source : local — accès OneDrive : OK`, puis un nombre de fichiers.
+En cas de refus sur un dossier, diagnostic niveau par niveau (affiché chez vous seulement) :
+```
+$ su - penny -c 'penny onedrive check "<dossier>"'
+```
+Attendu : « traversable seulement » pour la racine et les dossiers intermédiaires, « ok :
+traversable et lisible » pour le dossier choisi. Un niveau « NON traversable » manque du droit
+`search` ; « INTROUVABLE » signale un nom différent (accents, espaces, majuscules).
+Le dossier se donne relatif à la racine OneDrive, ou en chemin complet `/Users/<vous>/Library/…`
+(pas `~/…`, qui désignerait le dossier de `penny`).
 Un dossier non autorisé doit rester illisible :
 ```
 $ su - penny -c 'ls ~/Library/CloudStorage/OneDrive-*/'
@@ -393,6 +402,8 @@ Bilan à noter : score sur 10, temps moyen par document et par question, limites
 | Écran « Docker / Kubernetes / Linux » | Premier lancement d'OrbStack | Choisir Docker |
 | `vmgr … missing TCC permission for data storage directory` au démarrage | OrbStack lancé par launchd (testé le 08/11) | Pas de démarrage automatique de Docker sur le Mac : `su - penny -c 'orb start'` |
 | Étape 9 : `~/penny` introuvable sous `penny` | Ancienne version du tutoriel (copie du dépôt jamais créée) | Penny est déployée dans `/opt/penny` (étape 11.2), puis vérification par `/opt/penny/current/scripts/install.sh` |
+| `penny scan` : « ne peut pas lire ce dossier » | Nom différent, chemin pris depuis la mauvaise racine, ou niveau intermédiaire sans droit `search` | `penny onedrive check "<dossier>"` indique le niveau en cause |
+| Refus « Penny doit tourner sous le compte penny » alors qu'on est sous `su - penny` | Le garde-fou lisait `USER`/`LOGNAME` (corrigé le 18/11 : compte réel du processus) | Redéployer |
 | Un bloc de commandes collé derrière `sudo` n'affiche rien | La saisie du mot de passe avale les lignes suivantes | Une commande à la fois |
 
 ## Constats de sécurité (testés)

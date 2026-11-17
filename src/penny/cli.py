@@ -75,7 +75,15 @@ Répondre ainsi :
 
 
 def cmd_check(cfg: Config, args) -> None:
-    print(_source(cfg).check())
+    source = _source(cfg)
+    if cfg.source == "local" and args.dossier:
+        print(f"Diagnostic de « {args.dossier} » vu par penny (reste sur votre écran) :")
+        for label, state in source.diagnose(args.dossier):
+            print(f"  {label:<40} {state}")
+        print("Attendu : « traversable seulement » pour les niveaux intermédiaires, "
+              "« ok : traversable et lisible » pour le dossier choisi.")
+        return
+    print(source.check())
     print(f"Source : {cfg.source} — accès OneDrive : OK")
 
 
@@ -132,7 +140,9 @@ def main(argv: list[str] | None = None) -> None:
     od = sub.add_parser("onedrive", help="accès OneDrive (lecture seule)")
     od_sub = od.add_subparsers(dest="action", required=True)
     od_sub.add_parser("connect", help="configurer l'accès (une fois)").set_defaults(func=cmd_connect)
-    od_sub.add_parser("check", help="vérifier l'accès").set_defaults(func=cmd_check)
+    p = od_sub.add_parser("check", help="vérifier l'accès (et diagnostiquer un dossier)")
+    p.add_argument("dossier", nargs="?", help="dossier à diagnostiquer, niveau par niveau")
+    p.set_defaults(func=cmd_check)
     p = sub.add_parser("scan", help="inventorier et analyser un dossier OneDrive")
     p.add_argument("root", help="dossier OneDrive, ex. « Documents/Administratif »")
     p.add_argument("--limit", type=int, default=None, help="nombre maximal de fichiers à analyser ce passage")
