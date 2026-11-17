@@ -251,8 +251,9 @@ de fichier ni contenu). Un problème sur un vrai document se reproduit avec un d
 ### 11.1 Outils (votre compte)
 
 ```
-$ brew install uv rclone
+$ brew install uv
 ```
+rclone n'est nécessaire que pour la source « rclone » (alternative, en fin d'étape 11.3).
 
 ### 11.2 Déployer Penny
 
@@ -275,36 +276,64 @@ $ su - penny -c 'penny status'
 ```
 Attendu : propriétaire `root wheel` ; `Prérequis OK.` ; `Aucun dossier analysé.`
 
-### 11.3 Connecter OneDrive en lecture seule
+### 11.3 Donner à `penny` l'accès aux seuls dossiers choisis
 
+**Source retenue : le OneDrive synchronisé sur le Mac** (`~/Library/CloudStorage/OneDrive-…`).
+Penny le lit sur place : **ni copie, ni réseau, ni jeton Microsoft**. C'est macOS qui limite
+`penny` aux dossiers choisis, par des droits d'accès étendus (ACL). Testé le 18/11/2026.
+
+Le déploiement (11.2) renseigne `PENNY_LOCAL_ROOT` avec votre dossier OneDrive local.
+
+**1. Rendre les fichiers disponibles hors ligne.** Dans le Finder, clic droit sur le dossier à
+analyser → **Toujours conserver sur cet appareil**. Sinon, les fichiers « à la demande » ne sont
+pas réellement sur le disque et Penny les signalera en erreur.
+
+**2. Laisser `penny` traverser votre dossier personnel**, sans pouvoir en lister le contenu
+(droit `search` seul), depuis **votre** compte :
+```
+$ chmod +a "penny allow search" ~ ~/Library ~/Library/CloudStorage
+$ chmod +a "penny allow search" ~/Library/CloudStorage/OneDrive-*
+```
+Si le dossier choisi est plus profond, ajouter le même droit `search` à chaque dossier
+intermédiaire entre la racine OneDrive et lui.
+
+**3. Donner la lecture du dossier choisi**, et de lui seul (remplacer `<dossier>` par son chemin
+complet ; **ne jamais le transmettre à Claude**) :
+```
+$ chmod -R +a "penny allow list,search,read,readattr,readextattr,file_inherit,directory_inherit" "<dossier>"
+```
+`file_inherit,directory_inherit` : les fichiers ajoutés plus tard dans ce dossier seront lisibles
+aussi.
+
+**4. Vérifier**, depuis votre compte :
+```
+$ su - penny -c 'penny onedrive check'
+$ su - penny -c 'find "<dossier>" -type f | wc -l'
+```
+Attendu : `Source : local — accès OneDrive : OK`, puis un nombre de fichiers.
+Un dossier non autorisé doit rester illisible :
+```
+$ su - penny -c 'ls ~/Library/CloudStorage/OneDrive-*/'
+```
+Attendu : `Permission denied` (penny peut traverser, pas lister).
+
+**Retirer un accès** : `chmod -R -a "penny allow list,search,read,readattr,readextattr,file_inherit,directory_inherit" "<dossier>"`.
+**Voir les droits** : `ls -led "<dossier>"`.
+
+> Les papiers sensibles (identité, santé…) : il suffit de ne pas donner l'accès à leur dossier.
+
+#### Alternative : source rclone (accès par Internet, lecture seule)
+
+À n'utiliser que si le OneDrive n'est pas synchronisé sur le Mac. `brew install rclone`, puis dans
+`/Users/penny/.config/penny/penny.env` : `PENNY_SOURCE=rclone`, et :
 ```
 $ su - penny
 penny% penny onedrive connect
 ```
-Penny lance l'assistant de rclone et rappelle les réponses à donner :
-- nom `penny-onedrive`, stockage `onedrive`, `client_id` et `client_secret` vides ;
-- options avancées : `access_scopes` = `Files.Read offline_access`
-  (si refusé : « Read only access to all resources ») ;
-- authentification par navigateur : **non**. rclone affiche une commande
-  `rclone authorize "onedrive" …` : la copier, l'exécuter **dans un autre terminal de votre
-  compte** ; le navigateur s'ouvre. **Vérifier que Microsoft n'affiche que des droits de
-  lecture**, accepter, puis coller le jeton dans le terminal de `penny` ;
-- choisir **OneDrive personnel** ;
-- enfin `s) Set configuration password` : choisir un mot de passe (configuration chiffrée).
-
-Option : ranger ce mot de passe dans le trousseau de `penny` pour ne pas le saisir à chaque fois.
-```
-penny% security add-generic-password -a penny -s penny-rclone -w
-```
-puis décommenter `PENNY_RCLONE_PASSWORD_COMMAND` dans `~/.config/penny/penny.env`.
-> **À tester** : via `su`, le trousseau de `penny` peut être verrouillé. Si Penny affiche
-> « trousseau verrouillé », lancer `security unlock-keychain` (mot de passe de `penny`), ou
-> laisser la ligne commentée et saisir le mot de passe à chaque lancement.
-
-```
-penny% penny onedrive check
-```
-Attendu : l'espace utilisé et total, puis `Accès OneDrive : OK`.
+Penny rappelle les réponses à donner à l'assistant rclone (nom `penny-onedrive`, `access_scopes`
+= `Files.Read offline_access`, autorisation par `rclone authorize` lancé dans votre session,
+configuration chiffrée). Limite : Microsoft ne propose aucun droit limité à un dossier pour un
+compte personnel ; le jeton peut lire tout le OneDrive.
 
 ### 11.4 Premier passage
 
@@ -312,13 +341,15 @@ Attendu : l'espace utilisé et total, puis `Accès OneDrive : OK`.
 vous connaissez la réponse dans ce dossier, dont **2 sans réponse**. C'est le critère de réussite.
 
 ```
-penny% penny scan "Chemin/Du/Dossier" --limit 50
+penny% penny scan "Chemin/Du/Dossier" --limit 50     # relatif à la racine OneDrive
 penny% penny status
 ```
 - L'inventaire complet s'affiche tout de suite ; 50 fichiers au plus sont analysés à chaque passage.
   Relancer la même commande pour continuer (ou sans `--limit` pour tout faire).
 - `Ctrl-C` à tout moment : la commande suivante reprend où elle s'était arrêtée.
 - Le premier PDF déclenche le téléchargement des modèles de Docling (une fois).
+- Avec la source locale, aucun fichier n'est copié : Penny lit sur place et ne garde que le
+  texte extrait (Markdown) et sa mémoire, sous `/Users/penny/penny-data`.
 - `penny status` indique combien de fichiers sont **sans texte** (scans, photos) : ils sont listés,
   en attente d'OCR (incrément ultérieur).
 

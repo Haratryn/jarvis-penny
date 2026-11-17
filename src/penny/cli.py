@@ -11,6 +11,7 @@ from . import db
 from .config import Config, load_config
 from .extract import LocalExtractor
 from .llm import LLMError, Ollama
+from .localfolder import LocalFolderSource
 from .onedrive import OneDriveError, RcloneOneDrive
 from .pipeline import Scanner
 from .report import diag_text, status_text
@@ -25,8 +26,12 @@ def _guard_account() -> None:
                  "C'est ce qui empêche les autres programmes, dont Claude, de lire ses données.")
 
 
-def _source(cfg: Config) -> RcloneOneDrive:
-    return RcloneOneDrive(cfg.rclone_bin, cfg.rclone_remote, cfg.rclone_config, cfg.rclone_password_command)
+def _source(cfg: Config, conn=None):
+    if cfg.source == "local":
+        return LocalFolderSource(cfg.local_root, conn or db.connect(cfg.db_path), cfg.max_file_mb)
+    if cfg.source == "rclone":
+        return RcloneOneDrive(cfg.rclone_bin, cfg.rclone_remote, cfg.rclone_config, cfg.rclone_password_command)
+    sys.exit(f"PENNY_SOURCE inconnu : {cfg.source} (attendu : local ou rclone)")
 
 
 def _llm(cfg: Config) -> Ollama:
@@ -34,6 +39,8 @@ def _llm(cfg: Config) -> Ollama:
 
 
 def cmd_connect(cfg: Config, args) -> None:
+    if cfg.source != "rclone":
+        sys.exit("Source « dossier local » : aucune connexion à configurer (tutoriel, étape 11.3).")
     cfg.rclone_config.parent.mkdir(parents=True, exist_ok=True)
     os.chmod(cfg.rclone_config.parent, 0o700)
     print(f"""Configuration de l'accès OneDrive en LECTURE SEULE (assistant rclone).
@@ -61,12 +68,12 @@ Répondre ainsi :
 
 def cmd_check(cfg: Config, args) -> None:
     print(_source(cfg).check())
-    print("Accès OneDrive : OK")
+    print(f"Source : {cfg.source} — accès OneDrive : OK")
 
 
 def cmd_scan(cfg: Config, args) -> None:
     conn = db.connect(cfg.db_path)
-    scanner = Scanner(conn, _source(cfg), LocalExtractor(), _llm(cfg), cfg.cache_dir, cfg.markdown_dir,
+    scanner = Scanner(conn, _source(cfg, conn), LocalExtractor(), _llm(cfg), cfg.cache_dir, cfg.markdown_dir,
                       cfg.max_file_mb)
     def progress(n: int, total: int) -> None:
         print(f"\r  traitement {n}/{total}…", end="", file=sys.stderr, flush=True)

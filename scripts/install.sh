@@ -25,7 +25,12 @@ echo "Vérifications :"
 id -Gn | grep -qw admin && fail "le compte ne doit pas être administrateur" || ok "compte non administrateur"
 [[ -f "$CONF" ]] && ok "configuration $CONF" || fail "configuration absente : $CONF (déployer : étape 11)"
 command -v penny >/dev/null && ok "commande penny ($(command -v penny))" || fail "commande penny absente (déployer : étape 11)"
-[[ -x "${PENNY_RCLONE_BIN:-}" ]] && ok "rclone" || fail "rclone introuvable (${PENNY_RCLONE_BIN:-non configuré})"
+if [[ "${PENNY_SOURCE:-local}" == "rclone" ]]; then
+  [[ -x "${PENNY_RCLONE_BIN:-}" ]] && ok "rclone" || fail "rclone introuvable (${PENNY_RCLONE_BIN:-non configuré})"
+else
+  [[ -n "${PENNY_LOCAL_ROOT:-}" ]] && ok "source : dossier OneDrive local" || fail "PENNY_LOCAL_ROOT vide (relancer le déploiement)"
+  [[ -x "${PENNY_LOCAL_ROOT:-/nonexistent}" ]] && ok "dossier OneDrive local traversable" || fail "penny ne peut pas traverser le dossier OneDrive local (étape 11.3)"
+fi
 
 case "$PENNY_PROFILE" in
   mac)

@@ -58,6 +58,10 @@ class FakeOneDrive:
                            hash="quickxor:" + hashlib.sha1(c.encode()).hexdigest())
                 for i, (p, c) in sorted(self.files.items())]
 
+    def fetch(self, root: str, item: RemoteFile, dest: Path) -> Path:
+        self.download(root, item, dest)
+        return dest
+
     def download(self, root: str, item: RemoteFile, dest: Path) -> None:
         if item.id in self.fail_on:
             from penny.onedrive import OneDriveError

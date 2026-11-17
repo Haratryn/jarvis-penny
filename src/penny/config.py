@@ -36,6 +36,8 @@ class Config:
     rclone_config: Path
     rclone_password_command: str
     max_file_mb: int
+    source: str          # "local" (OneDrive synchronisé sur le Mac) ou "rclone"
+    local_root: Path     # racine du OneDrive local (source "local")
 
     @property
     def db_path(self) -> Path:
@@ -68,4 +70,6 @@ def load_config() -> Config:
         rclone_config=Path(get("PENNY_RCLONE_CONFIG", str(home / ".config/penny/rclone.conf"))).expanduser(),
         rclone_password_command=get("PENNY_RCLONE_PASSWORD_COMMAND", ""),
         max_file_mb=int(get("PENNY_MAX_FILE_MB", "50")),
+        source=get("PENNY_SOURCE", "local" if get("PENNY_LOCAL_ROOT", "") else "rclone"),
+        local_root=Path(get("PENNY_LOCAL_ROOT", "")).expanduser(),
     )

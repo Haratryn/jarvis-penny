@@ -41,10 +41,18 @@ UV="$(find_tool uv)"
 RCLONE="$(find_tool rclone)"
 OLLAMA="/usr/local/bin/ollama"
 [[ -x "$UV" ]] || die "uv absent : brew install uv (depuis votre compte)"
-[[ -x "$RCLONE" ]] || die "rclone absent : brew install rclone (depuis votre compte)"
+[[ -x "$RCLONE" ]] || info "rclone absent : inutile avec la source « dossier local »"
+
+# OneDrive synchronisé sur le Mac du développeur (source « dossier local »)
+ONEDRIVE_LOCAL=""
+for d in "/Users/$SUDO_USER/Library/CloudStorage"/OneDrive-*; do
+  [[ -d "$d" ]] || continue
+  [[ -z "$ONEDRIVE_LOCAL" ]] || { info "plusieurs dossiers OneDrive : renseigner PENNY_LOCAL_ROOT à la main"; ONEDRIVE_LOCAL=""; break; }
+  ONEDRIVE_LOCAL="$d"
+done
 
 # Un binaire utilisé par Penny ne doit pas être modifiable par penny.
-for bin in "$UV" "$RCLONE"; do
+for bin in "$UV" ${RCLONE:+"$RCLONE"}; do
   real="$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$bin")"
   dir="$real"
   while [[ "$dir" != "/" ]]; do
@@ -52,7 +60,8 @@ for bin in "$UV" "$RCLONE"; do
     dir="$(dirname "$dir")"
   done
 done
-info "uv : $("$UV" --version) ; rclone : $("$RCLONE" version | head -1)"
+info "uv : $("$UV" --version)"
+[[ -x "$RCLONE" ]] && info "rclone : $("$RCLONE" version | head -1)"
 
 echo "Déploiement de la version $COMMIT :"
 REL="$BASE/releases/$COMMIT"
@@ -89,6 +98,7 @@ while IFS= read -r line; do
   [[ "$line" =~ ^(PENNY_[A-Z_]+)=(.*)$ ]] || continue
   key="${BASH_REMATCH[1]}"; value="${BASH_REMATCH[2]}"
   [[ "$key" == "PENNY_RCLONE_BIN" ]] && value="$RCLONE"
+  [[ "$key" == "PENNY_LOCAL_ROOT" ]] && value="$ONEDRIVE_LOCAL"
   if ! grep -qE "^${key}=.+" "$CONF"; then
     tmp="$(mktemp)"
     grep -vE "^${key}=" "$CONF" > "$tmp" || true
@@ -105,7 +115,13 @@ LLM_MODEL="$(value_of PENNY_LLM_MODEL)"
 EMBED_MODEL="$(value_of PENNY_EMBED_MODEL)"
 OLLAMA_URL="$(value_of PENNY_OLLAMA_URL)"
 [[ -n "$LLM_MODEL" && -n "$EMBED_MODEL" && -n "$OLLAMA_URL" ]] || die "configuration incomplète : $CONF"
-[[ -x "$(value_of PENNY_RCLONE_BIN)" ]] || die "PENNY_RCLONE_BIN invalide dans $CONF"
+if [[ "$(value_of PENNY_SOURCE)" == "rclone" ]]; then
+  [[ -x "$(value_of PENNY_RCLONE_BIN)" ]] || die "PENNY_RCLONE_BIN invalide dans $CONF"
+else
+  [[ -n "$(value_of PENNY_LOCAL_ROOT)" ]] || die "PENNY_LOCAL_ROOT vide dans $CONF (dossier OneDrive local introuvable)"
+  sudo -u "$SERVICE_USER" test -x "$(value_of PENNY_LOCAL_ROOT)" \
+    || info "penny ne peut pas encore traverser le dossier OneDrive : faire l'étape 11.3"
+fi
 
 echo "Modèles Ollama de $SERVICE_USER (téléchargement si absent, peut être long) :"
 [[ -x "$OLLAMA" ]] || die "ollama introuvable : $OLLAMA"

@@ -182,7 +182,7 @@ class Scanner:
             t = time.monotonic()
             local = self.cache_dir / safe_id(item_id) / f"{safe_id(hash_)[-24:]}{row['ext']}"
             remote = RemoteFile(item_id, row["path"], row["name"], row["size"], row["mtime"] or "", hash_)
-            self.source.download(root, remote, local)
+            local = self.source.fetch(root, remote, local)
             self._timed("download", t)
             self._set_state(item_id, hash_, "downloaded", local_path=str(local))
             state = "downloaded"

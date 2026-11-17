@@ -2,14 +2,15 @@
 
 Assistant personnel local : seconde mémoire, suivi des engagements, anticipation des échéances.
 
-État : **incrément 1** — analyser un dossier OneDrive réel (lecture seule), l'inventorier et
+État : **incrément 1** — analyser un dossier OneDrive réel (lu sur place dans le OneDrive
+synchronisé du Mac, sans réseau ; rclone en alternative), l'inventorier et
 répondre avec des sources. IA 100 % locale (Ollama). Penny voit les données réelles sous le
 compte `penny` ; Claude Code ne voit que des données inventées (voir `CLAUDE.md`).
 
 ## Utilisation (compte `penny`)
 
 ```
-penny onedrive connect | check     # accès OneDrive en lecture seule (rclone)
+penny onedrive check              # accès au OneDrive local (ou connect|check avec rclone)
 penny scan "<dossier>" [--limit N] # inventaire puis analyse (reprise automatique)
 penny status [<dossier>]           # listés, analysés, sans texte, ignorés, erreurs
 penny docs [--type T] [--sans-texte]
@@ -36,7 +37,7 @@ Développement : `uv sync --group dev && uv run pytest` (faux OneDrive, faux mod
 | `config/` | Configuration **sans secret** : `machine.example.env` (machine), `penny.example.env` (compte penny) |
 | `scripts/` | `install.sh` : vérification des prérequis (compte `penny`) ; `mac/install-services.sh` : démarrage automatique d'Ollama ; `mac/deploy-penny.sh` : déploiement de Penny |
 | `deploy/` | Fichiers système par profil (`mac/launchd/` : modèle du LaunchDaemon d'Ollama) |
-| `src/penny/` | Code de Penny : `onedrive` (rclone), `extract` (Docling), `pipeline` (scan), `search` (réponses citées), `report` (état, diagnostic), `cli` |
+| `src/penny/` | Code de Penny : `localfolder` (OneDrive local), `onedrive` (rclone), `extract` (Docling), `pipeline` (scan), `search` (réponses citées), `report` (état, diagnostic), `cli` |
 | `tests/fixtures/` | Jeu de test inventé, en français, avec réponses attendues |
 | `docs/` | Décisions, notes techniques et tutoriels (`installation-mac.md`) |
 

@@ -29,7 +29,8 @@ class RemoteFile:
 
 class Source(Protocol):
     def list_files(self, root: str) -> list[RemoteFile]: ...
-    def download(self, root: str, item: RemoteFile, dest: Path) -> None: ...
+    def fetch(self, root: str, item: RemoteFile, dest: Path) -> Path:
+        """Rend un chemin local lisible : copie téléchargée dans dest, ou fichier lu sur place."""
 
 
 class OneDriveError(RuntimeError):
@@ -97,6 +98,10 @@ class RcloneOneDrive:
     def download(self, root: str, item: RemoteFile, dest: Path) -> None:
         dest.parent.mkdir(parents=True, exist_ok=True)
         self._run(["copyto", self._remote_path(root, item.path), str(dest)])
+
+    def fetch(self, root: str, item: RemoteFile, dest: Path) -> Path:
+        self.download(root, item, dest)
+        return dest
 
     def check(self) -> str:
         return self._run(["about", f"{self.remote}:"])
