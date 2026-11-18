@@ -131,8 +131,9 @@ class Searcher:
         return Answer(text, sources, scope_text)
 
 
-def cards_listing(conn: sqlite3.Connection, root: str | None, doc_type: str | None, no_text: bool) -> list[dict]:
-    sql = ("SELECT i.root, i.path, i.ext, p.state, p.reason, c.doc_type, c.doc_date, c.title, c.parties, c.subject"
+def cards_listing(conn: sqlite3.Connection, root: str | None, doc_type: str | None, no_text: bool,
+                  state: str | None = None) -> list[dict]:
+    sql = ("SELECT i.root, i.path, i.ext, p.state, p.reason, p.detail, c.doc_type, c.doc_date, c.title, c.parties, c.subject"
            " FROM items i LEFT JOIN processing p ON p.item_id = i.id AND p.hash = i.hash"
            " LEFT JOIN cards c ON c.item_id = i.id AND c.hash = i.hash WHERE i.gone = 0")
     args: list = []
@@ -144,6 +145,9 @@ def cards_listing(conn: sqlite3.Connection, root: str | None, doc_type: str | No
         args.append(f"%{doc_type.lower()}%")
     if no_text:
         sql += " AND p.state = 'no_text'"
+    if state:
+        sql += " AND p.state = ?"
+        args.append(state)
     sql += " ORDER BY c.doc_date DESC NULLS LAST, i.path"
     out = []
     for r in conn.execute(sql, args):

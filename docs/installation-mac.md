@@ -385,6 +385,8 @@ penny% penny status
 penny% penny docs                       # inventaire : date, type, titre, personnes, chemin
 penny% penny docs --type facture
 penny% penny docs --sans-texte          # scans et photos non lus
+penny% penny docs --erreurs             # fichiers en erreur, avec le détail (à garder pour vous)
+penny% penny docs --ignores             # fichiers ignorés et pourquoi
 penny% penny ask "Où est mon attestation d'assurance habitation ?"
 penny% penny diag                       # rapport anonymisé, le seul à transmettre à Claude
 ```

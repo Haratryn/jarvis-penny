@@ -73,6 +73,15 @@ def diag_text(conn: sqlite3.Connection, llm_model: str, embed_model: str) -> str
                FROM items i LEFT JOIN processing p ON p.item_id = i.id WHERE i.gone = 0
                GROUP BY 1, 2 ORDER BY 3 DESC"""):
         out.append(f"    {r['n']:>6}  {r['state']}" + (f" ({r['reason']})" if r["reason"] else ""))
+    for state, label in (("skipped", "Ignorés par extension et raison :"), ("error", "Erreurs par extension et type :"),
+                         ("no_text", "Sans texte par extension :")):
+        rows = conn.execute(
+            """SELECT i.ext, p.reason, COUNT(*) AS n FROM items i JOIN processing p ON p.item_id = i.id
+               WHERE i.gone = 0 AND p.hash = i.hash AND p.state = ? GROUP BY 1, 2 ORDER BY 3 DESC LIMIT 20""",
+            (state,)).fetchall()
+        if rows:
+            out.append(label)
+            out += [f"    {r['n']:>6}  {r['ext'] or '(aucune)'}  {r['reason'] or ''}" for r in rows]
     out.append("Extensions (fichiers présents) :")
     for r in conn.execute("SELECT ext, COUNT(*) AS n FROM items WHERE gone = 0 GROUP BY ext ORDER BY n DESC LIMIT 15"):
         out.append(f"    {r['n']:>6}  {r['ext'] or '(aucune)'}")

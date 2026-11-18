@@ -209,3 +209,15 @@ def test_aucun_verrou_pendant_les_appels_au_modele(env):
     env.llm.embed = embed_and_check
     env.scanner.scan(ROOT, limit=2)
     assert seen
+
+
+def test_detail_des_erreurs_local_mais_pas_dans_diag(env):
+    env.source.fail_on = {"ID!102"}
+    env.scanner.scan(ROOT)
+    rows = cards_listing(env.conn, ROOT, None, False, "error")
+    assert len(rows) == 1 and rows[0]["reason"] == "OneDriveError" and "simulation" in rows[0]["detail"]
+    report = diag_text(env.conn, "m", "e")
+    assert "simulation" not in report and "avis-echeance" not in report
+    assert "Erreurs par extension" in report and "OneDriveError" in report
+    assert "Ignorés par extension" in report and ".zip" in report
+    assert len(cards_listing(env.conn, ROOT, None, False, "skipped")) == 1

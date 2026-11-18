@@ -83,13 +83,20 @@ def connect(path: Path, readonly: bool = False) -> sqlite3.Connection:
     if readonly and path.exists():
         conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=BUSY_TIMEOUT_S)
         conn.row_factory = sqlite3.Row
-        return conn
+        if "detail" in {r[1] for r in conn.execute("PRAGMA table_info(processing)")}:
+            return conn
+        conn.close()  # base d'une version antérieure : migration une fois, puis usage normal
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(path, timeout=BUSY_TIMEOUT_S)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
     conn.executescript(SCHEMA)
+    # Migrations légères (colonnes ajoutées après la première version)
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(processing)")}
+    if "detail" not in cols:
+        # Message d'erreur complet : affiché localement (penny docs --erreurs), JAMAIS dans diag.
+        conn.execute("ALTER TABLE processing ADD COLUMN detail TEXT")
     conn.execute("INSERT OR IGNORE INTO meta(key, value) VALUES ('schema_version', ?)", (str(SCHEMA_VERSION),))
     conn.commit()
     return conn

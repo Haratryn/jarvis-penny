@@ -281,8 +281,8 @@ class Scanner:
                 report.errors += 1
                 report.error_codes[code] = report.error_codes.get(code, 0) + 1
                 self.conn.execute(
-                    "UPDATE processing SET state='error', reason=?, attempts=attempts+1, updated_at=? WHERE item_id=?",
-                    (code, now(), row["id"]))
+                    "UPDATE processing SET state='error', reason=?, detail=?, attempts=attempts+1, updated_at=?"
+                    " WHERE item_id=?", (code, str(exc)[:500], now(), row["id"]))
                 self.conn.commit()
                 if progress is not None:
                     progress.file_done("error")

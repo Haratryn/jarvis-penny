@@ -121,9 +121,14 @@ def cmd_status(cfg: Config, args) -> None:
 
 
 def cmd_docs(cfg: Config, args) -> None:
-    rows = cards_listing(db.connect(cfg.db_path, readonly=True), args.root, args.type, args.sans_texte)
+    state = "error" if args.erreurs else "skipped" if args.ignores else None
+    rows = cards_listing(db.connect(cfg.db_path, readonly=True), args.root, args.type, args.sans_texte, state)
     for r in rows:
-        if r["doc_type"]:
+        if r["state"] in ("error", "skipped", "no_text"):
+            why = r["reason"] or ""
+            print(f"{'':10}  {'(' + r['state'] + ')':<18} {r['root'].strip('/')}/{r['path']}")
+            print(f"{'':12}{why}" + (f" : {r['detail']}" if r["state"] == "error" and r["detail"] else ""))
+        elif r["doc_type"]:
             who = ", ".join(r["parties"][:3])
             print(f"{r['doc_date'] or '????-??-??'}  {r['doc_type'][:18]:<18} {r['title'] or ''}"
                   + (f" — {who}" if who else "") + f"\n            {r['root'].strip('/')}/{r['path']}")
@@ -194,6 +199,8 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("root", nargs="?")
     p.add_argument("--type", help="filtrer par type (facture, contrat…)")
     p.add_argument("--sans-texte", action="store_true", help="seulement les scans et photos sans texte")
+    p.add_argument("--erreurs", action="store_true", help="seulement les fichiers en erreur, avec le détail")
+    p.add_argument("--ignores", action="store_true", help="seulement les fichiers ignorés, avec la raison")
     p.set_defaults(func=cmd_docs)
     p = sub.add_parser("ask", help="poser une question")
     p.add_argument("question")
