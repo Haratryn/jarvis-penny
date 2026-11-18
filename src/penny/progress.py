@@ -1,7 +1,9 @@
 """Affichage de l'avancement d'un scan.
 
-Aucun nom de fichier n'est affiché : les lignes peuvent être copiées telles quelles
-(à Claude, par exemple) sans divulguer de donnée.
+Par défaut, aucun nom de fichier n'est affiché : la ligne d'avancement peut être copiée
+telle quelle (à Claude, par exemple) sans divulguer de donnée. Avec details=True
+(penny scan --details), une ligne par document indique son chemin, son résultat et sa durée :
+c'est pour l'écran de l'utilisateur uniquement.
 """
 from __future__ import annotations
 
@@ -26,7 +28,9 @@ def duration(seconds: float) -> str:
 
 
 class Progress:
-    def __init__(self, stream=None, every: int = 10):
+    def __init__(self, stream=None, every: int = 10, details: bool = False):
+        self.details = details
+        self.path = ""
         self.stream = stream or sys.stderr
         self.tty = hasattr(self.stream, "isatty") and self.stream.isatty()
         self.every = every
@@ -47,8 +51,8 @@ class Progress:
                   "charge, trop volumineux)", file=self.stream)
         print(f"À analyser ce passage : {self.total} documents (sur {pending} en attente)", file=self.stream)
 
-    def file_start(self, n: int, ext: str) -> None:
-        self.n, self.ext, self.step = n, ext or "?", ""
+    def file_start(self, n: int, ext: str, path: str = "") -> None:
+        self.n, self.ext, self.step, self.path = n, ext or "?", "", path
         self._doc_start = time.monotonic()
         self._render()
 
@@ -56,10 +60,16 @@ class Progress:
         self.step = STEP_LABELS.get(step, step)
         self._render()
 
-    def file_done(self, outcome: str) -> None:
+    def file_done(self, outcome: str, note: str = "") -> None:
         self.done[outcome] = self.done.get(outcome, 0) + 1
+        seconds = time.monotonic() - self._doc_start
         if outcome == "indexed":
-            self.doc_seconds.append(time.monotonic() - self._doc_start)
+            self.doc_seconds.append(seconds)
+        if self.details:
+            mark = {"indexed": "analysé   ", "no_text": "sans texte", "skipped": "ignoré    ",
+                    "error": "ERREUR    "}.get(outcome, outcome)
+            line = f"  {mark} {seconds:5.0f} s  {self.path}" + (f"  — {note}" if note else "")
+            print(("\r\033[K" if self.tty else "") + line, file=self.stream, flush=True)
         self.step = ""
         if not self.tty and (self.n % self.every == 0 or self.n == self.total):
             self._render(force_line=True)

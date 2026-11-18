@@ -103,7 +103,7 @@ def cmd_scan(cfg: Config, args) -> None:
     conn = db.connect(cfg.db_path)
     scanner = Scanner(conn, _source(cfg, conn), LocalExtractor(), _llm(cfg), cfg.cache_dir, cfg.markdown_dir,
                       cfg.max_file_mb)
-    progress = Progress()
+    progress = Progress(details=args.details)
     print(f"Inventaire de « {args.root} »…")
     try:
         rep = scanner.scan(args.root, limit=args.limit, progress=progress, accept_gone=args.confirmer_disparitions)
@@ -200,6 +200,8 @@ def main(argv: list[str] | None = None) -> None:
     p = sub.add_parser("scan", help="inventorier et analyser un dossier OneDrive")
     p.add_argument("root", help="dossier OneDrive, ex. « Documents/Administratif »")
     p.add_argument("--limit", type=int, default=None, help="nombre maximal de fichiers à analyser ce passage")
+    p.add_argument("--details", action="store_true",
+                   help="afficher chaque document traité (chemin, résultat, durée) — pour votre écran seulement")
     p.add_argument("--confirmer-disparitions", action="store_true",
                    help="accepter qu'une grande partie des fichiers connus ait disparu")
     p.set_defaults(func=cmd_scan)

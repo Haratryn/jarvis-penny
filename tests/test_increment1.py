@@ -224,3 +224,13 @@ def test_detail_des_erreurs_local_mais_pas_dans_diag(env):
     assert "Erreurs par extension" in report and "OneDriveError" in report
     assert "Ignorés par extension" in report and ".zip" in report
     assert len(cards_listing(env.conn, ROOT, None, False, "skipped")) == 1
+
+
+def test_avancement_detaille_sur_demande(env):
+    import io
+    from penny.progress import Progress
+    out = io.StringIO()
+    env.scanner.scan(ROOT, progress=Progress(stream=out, every=1, details=True))
+    text = out.getvalue()
+    assert "analysé" in text and "Voitures/carte-grise-megane.md" in text
+    assert "attestation, 2026-04-01" in text and "sans texte" in text

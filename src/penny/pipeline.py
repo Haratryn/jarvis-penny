@@ -324,7 +324,7 @@ class Scanner:
                 break
             done += 1
             if progress is not None:
-                progress.file_start(n + 1, row["ext"])
+                progress.file_start(n + 1, row["ext"], f"{row['path']}")
             try:
                 outcome = self.process(root, row)
             except Exception as exc:  # un fichier en échec ne doit jamais arrêter l'analyse des autres
@@ -336,7 +336,7 @@ class Scanner:
                     " WHERE item_id=?", (code, str(exc)[:500], now(), row["id"]))
                 self.conn.commit()
                 if progress is not None:
-                    progress.file_done("error")
+                    progress.file_done("error", f"{code} : {str(exc)[:160]}")
                 if isinstance(exc, LLMUnreachable):
                     raise  # inutile de continuer sans modèle
                 refused_in_a_row = refused_in_a_row + 1 if isinstance(exc, LLMRefused) else 0
@@ -345,7 +345,9 @@ class Scanner:
                 continue
             refused_in_a_row = 0
             if progress is not None:
-                progress.file_done(outcome)
+                card = self.conn.execute("SELECT doc_type, doc_date FROM cards WHERE item_id = ?",
+                                         (row["id"],)).fetchone() if outcome == "indexed" else None
+                progress.file_done(outcome, f"{card['doc_type']}, {card['doc_date'] or 'sans date'}" if card else "")
             if outcome == "indexed":
                 report.processed += 1
             elif outcome == "no_text":

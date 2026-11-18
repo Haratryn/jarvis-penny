@@ -385,6 +385,9 @@ penny% penny status
   quelle) : `[12/50] — .pdf : fiche (modèle local) — écoulé 4 min 10 s — moyenne 21 s/doc — reste
   ~13 min — analysés 9, sans texte 2, ignorés 1, erreurs 0`.
 - Depuis un autre terminal, pendant le scan : `su - penny -c 'penny status'`.
+- `penny scan "<dossier>" --details` : une ligne par document traité (chemin, résultat, type et
+  date trouvés, durée). **Pour votre écran seulement** : ces lignes contiennent les noms des fichiers,
+  ne pas les transmettre à Claude.
 - Le premier PDF déclenche le téléchargement des modèles de Docling (une fois).
 - Avec la source locale, aucun fichier n'est copié : Penny lit sur place et ne garde que le
   texte extrait (Markdown) et sa mémoire, sous `/Users/penny/penny-data`.
