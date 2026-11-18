@@ -193,3 +193,20 @@ def test_fichiers_marques_disparus_a_tort_retrouves_sans_reanalyse(local):
     assert rep.new == 0 and rep.processed == 0 and local.llm.cards == cards
     assert dict(local.conn.execute("SELECT path, id FROM items").fetchall()) == ids
     assert local.conn.execute("SELECT COUNT(*) FROM items WHERE gone = 1").fetchone()[0] == 0
+
+
+def test_blocage_tcc_identifie(local, monkeypatch):
+    """Constaté sur le Mac le 18/11 : ACL correctes, mais listdir → EPERM (protection TCC)."""
+    import errno as err
+    import penny.localfolder as lf
+    real = os.listdir
+
+    def blocked(path):
+        if str(path).startswith(str(local.top)):
+            raise PermissionError(err.EPERM, "Operation not permitted", str(path))
+        return real(path)
+    monkeypatch.setattr(lf.os, "listdir", blocked)
+    rows = local.source.diagnose(ROOT)
+    assert "TCC" in rows[-1][1]
+    with pytest.raises(SourceError, match="TCC"):
+        local.source.list_files(ROOT)

@@ -310,7 +310,16 @@ $ chmod -R +a "penny allow list,search,read,readattr,readextattr,file_inherit,di
 `file_inherit,directory_inherit` : les fichiers ajoutés plus tard dans ce dossier seront lisibles
 aussi.
 
-**4. Vérifier**, depuis votre compte :
+**4. Autoriser l'application de terminal à lire OneDrive (protection macOS, TCC).** macOS protège
+les dossiers des fournisseurs cloud et attribue l'accès à l'application qui lance la commande —
+votre Terminal, même à travers `su - penny`. Réglages Système → Confidentialité et sécurité →
+Fichiers et dossiers → votre application de terminal : autoriser l'accès aux fichiers de OneDrive
+(ou accepter la demande « … souhaite accéder aux fichiers gérés par OneDrive » au premier scan).
+Sans cela, l'erreur est `Operation not permitted` (errno 1) alors que les droits sont bons.
+> Conséquence prévisible : un scan lancé automatiquement (launchd, sans terminal) sera bloqué de la
+> même façon. À traiter avec l'actualisation périodique (incrément 2).
+
+**5. Vérifier**, depuis votre compte :
 ```
 $ su - penny -c 'penny onedrive check'
 $ su - penny -c 'find "<dossier>" -type f | wc -l'
@@ -430,6 +439,7 @@ Bilan à noter : score sur 10, temps moyen par document et par question, limites
 | `sqlite3.OperationalError: database is locked` sur `penny status` pendant un scan | Les consultations écrivaient dans la base (corrigé le 18/11) | Redéployer ; les consultations sont désormais en lecture seule |
 | `Ollama injoignable … (HTTPError)` | Ollama répondait par une erreur, mal présentée (corrigé le 18/11) | Redéployer, puis `penny models check` donne la raison |
 | Inventaire « 0 fichiers … 5978 disparus » | Dossier devenu illisible pour penny, pris pour un dossier vide (défaut corrigé le 18/11) | Redéployer : l'inventaire refuse désormais de conclure et indique l'erreur ; les fichiers marqués à tort sont retrouvés avec leurs analyses au prochain inventaire réussi. Vérifier l'accès avec `penny onedrive check "<dossier>"` |
+| `Penny ne peut pas lister ce dossier` avec errno 1 / « Operation not permitted », alors que le diagnostic montre des droits corrects | Protection de la vie privée de macOS (TCC) sur les dossiers OneDrive, attribuée à l'application de terminal | Étape 11.3, point 4 : autoriser l'application de terminal |
 | Un bloc de commandes collé derrière `sudo` n'affiche rien | La saisie du mot de passe avale les lignes suivantes | Une commande à la fois |
 
 ## Constats de sécurité (testés)

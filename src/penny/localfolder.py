@@ -14,6 +14,7 @@ demande » non téléchargés pour rien).
 """
 from __future__ import annotations
 
+import errno
 import hashlib
 import os
 import sqlite3
@@ -25,6 +26,16 @@ from .extract import DOCLING_EXT, TEXT_EXT
 from .onedrive import OneDriveError, RemoteFile
 
 IGNORED_PREFIXES = (".", "~$")  # fichiers cachés, verrous Office
+TCC_HINT = ("bloqué par la protection de la vie privée de macOS (TCC) : autoriser l'application de terminal à accéder aux fichiers de OneDrive (Réglages Système → Confidentialité et sécurité → Fichiers et dossiers), tutoriel étape 11.3")
+
+
+def explain(exc: OSError) -> str:
+    """EPERM (errno 1) sur un dossier lisible = protection TCC de macOS, pas un droit de fichier."""
+    if exc.errno == errno.EPERM:
+        return TCC_HINT
+    if exc.errno == errno.EACCES:
+        return "droits de fichiers insuffisants pour penny (ACL, étape 11.3)"
+    return f"{exc.__class__.__name__}, errno {exc.errno}"
 
 
 class SourceError(OneDriveError):
@@ -90,6 +101,12 @@ class LocalFolderSource:
             if not p.is_dir():
                 rows.append((label, "n'est pas un dossier"))
                 break
+            if can_x and can_r:
+                try:
+                    os.listdir(p)  # essai réel : les droits peuvent être bons et macOS bloquer quand même
+                except OSError as exc:
+                    rows.append((label, "BLOQUÉ : " + explain(exc)))
+                    break
             rows.append((label, "ok : traversable et lisible" if can_x and can_r
                          else "traversable seulement (search)" if can_x
                          else "NON traversable (manque le droit search)"))
@@ -128,7 +145,7 @@ class LocalFolderSource:
         try:
             top_entries = os.listdir(top)
         except OSError as exc:
-            raise SourceError(f"Penny ne peut pas lister ce dossier ({exc.__class__.__name__}, errno {exc.errno}). "
+            raise SourceError(f"Penny ne peut pas lister ce dossier : {explain(exc)}. "
                               f"Diagnostic : penny onedrive check \"{root}\"") from None
         if not top_entries and missing:
             raise SourceError("le dossier apparaît vide alors que des fichiers y étaient connus : accès "
