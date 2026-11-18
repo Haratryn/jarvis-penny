@@ -125,7 +125,8 @@ def cmd_status(cfg: Config, args) -> None:
 
 def cmd_docs(cfg: Config, args) -> None:
     state = "error" if args.erreurs else "skipped" if args.ignores else None
-    rows = cards_listing(db.connect(cfg.db_path, readonly=True), args.root, args.type, args.sans_texte, state)
+    rows = cards_listing(db.connect(cfg.db_path, readonly=True), args.root, args.type, args.sans_texte, state,
+                         args.ext)
     for r in rows:
         if r["state"] in ("error", "skipped", "no_text"):
             why = r["reason"] or ""
@@ -139,6 +140,11 @@ def cmd_docs(cfg: Config, args) -> None:
             state = r["state"] or "en attente"
             print(f"{'':10}  {'(' + state + ')':<18} {r['root'].strip('/')}/{r['path']}")
     print(f"\n{len(rows)} fichiers.")
+    by_ext: dict[str, int] = {}
+    for r in rows:
+        by_ext[r["ext"] or "(aucune)"] = by_ext.get(r["ext"] or "(aucune)", 0) + 1
+    if len(by_ext) > 1:
+        print("Par extension : " + ", ".join(f"{e} {n}" for e, n in sorted(by_ext.items(), key=lambda x: -x[1])))
 
 
 def cmd_ask(cfg: Config, args) -> None:
@@ -206,6 +212,7 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--sans-texte", action="store_true", help="seulement les scans et photos sans texte")
     p.add_argument("--erreurs", action="store_true", help="seulement les fichiers en erreur, avec le détail")
     p.add_argument("--ignores", action="store_true", help="seulement les fichiers ignorés, avec la raison")
+    p.add_argument("--ext", help="seulement cette extension, ex. .doc")
     p.set_defaults(func=cmd_docs)
     p = sub.add_parser("ask", help="poser une question")
     p.add_argument("question")

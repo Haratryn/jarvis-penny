@@ -161,3 +161,16 @@ def test_ollama_remonte_la_raison_du_refus():
         server.shutdown()
     with pytest.raises(LLMUnreachable):
         Ollama("http://127.0.0.1:9", "m", "e", timeout=2).chat("s", "u")
+
+
+def test_docs_par_extension(cli_env, capsys):
+    cli.main(["scan", ROOT])
+    capsys.readouterr()
+    cli.main(["docs", "--ignores"])
+    out = capsys.readouterr().out
+    assert "archive.zip" in out and "format_non_pris_en_charge" in out and "1 fichiers." in out
+    cli.main(["docs", "--ext", "md"])
+    out = capsys.readouterr().out
+    assert "5 fichiers." in out and ".txt" not in out
+    cli.main(["docs"])
+    assert "Par extension : .md 5" in capsys.readouterr().out

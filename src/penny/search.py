@@ -132,7 +132,7 @@ class Searcher:
 
 
 def cards_listing(conn: sqlite3.Connection, root: str | None, doc_type: str | None, no_text: bool,
-                  state: str | None = None) -> list[dict]:
+                  state: str | None = None, ext: str | None = None) -> list[dict]:
     sql = ("SELECT i.root, i.path, i.ext, p.state, p.reason, p.detail, c.doc_type, c.doc_date, c.title, c.parties, c.subject"
            " FROM items i LEFT JOIN processing p ON p.item_id = i.id AND p.hash = i.hash"
            " LEFT JOIN cards c ON c.item_id = i.id AND c.hash = i.hash WHERE i.gone = 0")
@@ -148,6 +148,9 @@ def cards_listing(conn: sqlite3.Connection, root: str | None, doc_type: str | No
     if state:
         sql += " AND p.state = ?"
         args.append(state)
+    if ext:
+        sql += " AND i.ext = ?"
+        args.append(ext.lower() if ext.startswith(".") else "." + ext.lower())
     sql += " ORDER BY c.doc_date DESC NULLS LAST, i.path"
     out = []
     for r in conn.execute(sql, args):
