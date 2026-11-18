@@ -57,6 +57,10 @@ def safe_id(item_id: str) -> str:
     return re.sub(r"[^A-Za-z0-9_-]", "_", item_id)
 
 
+class InventoryAborted(RuntimeError):
+    """L'inventaire contredit trop la mémoire : rien n'est modifié."""
+
+
 @dataclass
 class ScanReport:
     listed: int = 0
@@ -69,6 +73,7 @@ class ScanReport:
     skipped: int = 0
     errors: int = 0
     remaining: int = 0
+    unreadable: int = 0
     error_codes: dict[str, int] = field(default_factory=dict)
 
 
@@ -104,9 +109,29 @@ class Scanner:
             self.progress.step_start(name)
 
     # --- Inventaire ---------------------------------------------------------------
-    def inventory(self, root: str, report: ScanReport) -> None:
+    def inventory(self, root: str, report: ScanReport, accept_gone: bool = False) -> None:
         files = self.source.list_files(root)
         report.listed = len(files)
+        unreadable_dirs = getattr(self.source, "unreadable_dirs", []) or []
+        unreadable_files = set(getattr(self.source, "unreadable_files", []) or [])
+        report.unreadable = len(unreadable_dirs) + len(unreadable_files)
+
+        # Garde-fou : on ne déclare jamais disparue une grande partie du dossier sans confirmation.
+        listed_ids = {f.id for f in files}
+        active = self.conn.execute("SELECT id, path FROM items WHERE root = ? AND gone = 0", (root,)).fetchall()
+
+        def unreadable(path: str) -> bool:
+            return path in unreadable_files or any(
+                d == "." or path == d or path.startswith(d.rstrip("/") + "/") for d in unreadable_dirs)
+
+        to_gone = [r["id"] for r in active if r["id"] not in listed_ids and not unreadable(r["path"])]
+        if active and not accept_gone and to_gone and (
+                len(to_gone) == len(active) or (len(to_gone) > len(active) // 2 and len(to_gone) >= 5)):
+            raise InventoryAborted(
+                f"{len(to_gone)} fichiers sur {len(active)} connus n'ont pas été retrouvés. Inventaire "
+                "abandonné sans rien modifier : vérifier l'accès (penny onedrive check \"<dossier>\"). "
+                "Si ces fichiers ont vraiment été supprimés ou déplacés hors du dossier : "
+                "relancer avec --confirmer-disparitions.")
         seen, stamp = set(), now()
         for f in files:
             seen.add(f.id)
@@ -126,10 +151,9 @@ class Scanner:
                 self.conn.execute(
                     "UPDATE items SET root=?, path=?, name=?, ext=?, size=?, mtime=?, hash=?, last_seen=?, gone=0"
                     " WHERE id=?", (root, f.path, f.name, ext, f.size, f.mtime, f.hash, stamp, f.id))
-        for (item_id,) in self.conn.execute("SELECT id FROM items WHERE root = ? AND gone = 0", (root,)).fetchall():
-            if item_id not in seen:
-                report.gone += 1
-                self.conn.execute("UPDATE items SET gone = 1 WHERE id = ?", (item_id,))
+        for item_id in to_gone:
+            report.gone += 1
+            self.conn.execute("UPDATE items SET gone = 1 WHERE id = ?", (item_id,))
         self.conn.commit()
 
     # --- Traitement -----------------------------------------------------------------
@@ -261,9 +285,9 @@ class Scanner:
                               (cur.lastrowid, f"{row['path']}\n{piece}"))
 
     # --- Orchestration ----------------------------------------------------------------
-    def scan(self, root: str, limit: int | None = None, progress=None) -> ScanReport:
+    def scan(self, root: str, limit: int | None = None, progress=None, accept_gone: bool = False) -> ScanReport:
         report = ScanReport()
-        self.inventory(root, report)
+        self.inventory(root, report, accept_gone)
         todo = self.pending(root)
         self.progress = progress
         if progress is not None:

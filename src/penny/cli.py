@@ -14,7 +14,7 @@ from .extract import LocalExtractor
 from .llm import LLMError, Ollama
 from .localfolder import LocalFolderSource
 from .onedrive import OneDriveError, RcloneOneDrive
-from .pipeline import Scanner
+from .pipeline import InventoryAborted, Scanner
 from .progress import Progress
 from .report import diag_text, status_text
 from .search import Searcher, cards_listing
@@ -106,11 +106,14 @@ def cmd_scan(cfg: Config, args) -> None:
     progress = Progress()
     print(f"Inventaire de « {args.root} »…")
     try:
-        rep = scanner.scan(args.root, limit=args.limit, progress=progress)
+        rep = scanner.scan(args.root, limit=args.limit, progress=progress, accept_gone=args.confirmer_disparitions)
     finally:
         progress.finish()
     print(f"Inventaire : {rep.listed} fichiers ({rep.new} nouveaux, {rep.changed} modifiés, "
           f"{rep.moved} déplacés ou renommés, {rep.gone} disparus)")
+    if rep.unreadable:
+        print(f"Attention : {rep.unreadable} fichiers ou dossiers illisibles par penny (non comptés comme "
+              "disparus) — voir penny onedrive check")
     print(f"Ce passage : {rep.processed} analysés, {rep.no_text} sans texte, {rep.skipped} ignorés, "
           f"{rep.errors} en erreur" + (f" {rep.error_codes}" if rep.error_codes else ""))
     print(f"Reste à traiter : {rep.remaining}" + (" — relancer la même commande pour continuer" if rep.remaining else ""))
@@ -191,6 +194,8 @@ def main(argv: list[str] | None = None) -> None:
     p = sub.add_parser("scan", help="inventorier et analyser un dossier OneDrive")
     p.add_argument("root", help="dossier OneDrive, ex. « Documents/Administratif »")
     p.add_argument("--limit", type=int, default=None, help="nombre maximal de fichiers à analyser ce passage")
+    p.add_argument("--confirmer-disparitions", action="store_true",
+                   help="accepter qu'une grande partie des fichiers connus ait disparu")
     p.set_defaults(func=cmd_scan)
     p = sub.add_parser("status", help="état de l'analyse")
     p.add_argument("root", nargs="?")
@@ -218,7 +223,7 @@ def main(argv: list[str] | None = None) -> None:
     os.chmod(cfg.data_dir, 0o700)
     try:
         args.func(cfg, args)
-    except (OneDriveError, LLMError) as exc:
+    except (OneDriveError, LLMError, InventoryAborted) as exc:
         sys.exit(f"Erreur : {exc}")
     except sqlite3.OperationalError as exc:
         if "locked" in str(exc):

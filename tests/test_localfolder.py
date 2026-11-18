@@ -132,3 +132,64 @@ def test_diagnostic_niveau_par_niveau(local):
             assert "NON traversable" in rows[-1][1]
     finally:
         os.chmod(local.top, 0o755)
+
+
+# --- Constaté sur le Mac le 18/11 : dossier illisible pris pour un dossier vide, 5978 « disparus » ---
+
+def test_dossier_racine_illisible_erreur_et_rien_de_disparu(local):
+    if os.geteuid() == 0:
+        pytest.skip("root passe outre les droits")
+    local.scanner.scan(ROOT)
+    os.chmod(local.top, 0o311)  # traversable mais plus listable
+    try:
+        with pytest.raises(SourceError, match="ne peut pas li"):
+            local.scanner.scan(ROOT)
+    finally:
+        os.chmod(local.top, 0o755)
+    assert local.conn.execute("SELECT COUNT(*) FROM items WHERE gone = 1").fetchone()[0] == 0
+
+
+def test_sous_dossier_illisible_ses_fichiers_ne_sont_pas_disparus(local):
+    if os.geteuid() == 0:
+        pytest.skip("root passe outre les droits")
+    local.scanner.scan(ROOT)
+    os.chmod(local.top / "Voitures", 0o000)
+    try:
+        rep = local.scanner.scan(ROOT)
+    finally:
+        os.chmod(local.top / "Voitures", 0o755)
+    assert rep.gone == 0 and rep.unreadable == 1
+    assert local.conn.execute("SELECT COUNT(*) FROM items WHERE gone = 1").fetchone()[0] == 0
+
+
+def test_dossier_soudain_vide_inventaire_refuse(local):
+    local.scanner.scan(ROOT)
+    for child in list(local.top.iterdir()):
+        shutil.rmtree(child) if child.is_dir() else child.unlink()
+    with pytest.raises(SourceError, match="apparaît vide"):
+        local.scanner.scan(ROOT)
+    assert local.conn.execute("SELECT COUNT(*) FROM items WHERE gone = 1").fetchone()[0] == 0
+
+
+def test_disparition_massive_demande_confirmation(local):
+    from penny.pipeline import InventoryAborted
+    local.scanner.scan(ROOT)
+    for sub in ("Assurances", "Voitures", "Maison"):
+        shutil.rmtree(local.top / sub)
+    with pytest.raises(InventoryAborted, match="confirmer-disparitions"):
+        local.scanner.scan(ROOT)
+    assert local.conn.execute("SELECT COUNT(*) FROM items WHERE gone = 1").fetchone()[0] == 0
+    rep = local.scanner.scan(ROOT, accept_gone=True)
+    assert rep.gone == 6
+
+
+def test_fichiers_marques_disparus_a_tort_retrouves_sans_reanalyse(local):
+    local.scanner.scan(ROOT)
+    ids = dict(local.conn.execute("SELECT path, id FROM items").fetchall())
+    local.conn.execute("UPDATE items SET gone = 1")   # l'état laissé par le défaut du 18/11
+    local.conn.commit()
+    cards = local.llm.cards
+    rep = local.scanner.scan(ROOT)
+    assert rep.new == 0 and rep.processed == 0 and local.llm.cards == cards
+    assert dict(local.conn.execute("SELECT path, id FROM items").fetchall()) == ids
+    assert local.conn.execute("SELECT COUNT(*) FROM items WHERE gone = 1").fetchone()[0] == 0

@@ -105,13 +105,36 @@ class LocalFolderSource:
 
     def list_files(self, root: str) -> list[RemoteFile]:
         top = self._root_dir(root)
+        # Tous les fichiers connus, y compris ceux marqués disparus : un fichier qui réapparaît
+        # au même chemin retrouve son identifiant et ses analyses.
         known = {r["path"]: r for r in self.conn.execute(
-            "SELECT id, path, size, mtime, hash FROM items WHERE root = ? AND gone = 0", (root,))}
-        missing = dict(known)
+            "SELECT id, path, size, mtime, hash FROM items WHERE root = ? ORDER BY gone DESC", (root,))}
+        missing = {p: r for p, r in known.items()}
         found: list[RemoteFile] = []
         unknown: list[tuple[str, str, int, str, str]] = []
+        # Ce qui n'a pas pu être lu n'est PAS « disparu » : le scan ne doit rien en conclure.
+        self.unreadable_dirs: list[str] = []
+        self.unreadable_files: list[str] = []
+        errors: list[OSError] = []
 
-        for dirpath, dirnames, filenames in os.walk(top, followlinks=False):
+        def on_error(exc: OSError) -> None:
+            errors.append(exc)
+            where = Path(exc.filename) if exc.filename else top
+            try:
+                self.unreadable_dirs.append(where.relative_to(top).as_posix())
+            except ValueError:
+                self.unreadable_dirs.append(".")
+
+        try:
+            top_entries = os.listdir(top)
+        except OSError as exc:
+            raise SourceError(f"Penny ne peut pas lister ce dossier ({exc.__class__.__name__}, errno {exc.errno}). "
+                              f"Diagnostic : penny onedrive check \"{root}\"") from None
+        if not top_entries and missing:
+            raise SourceError("le dossier apparaît vide alors que des fichiers y étaient connus : accès "
+                              "probablement perdu (droits, OneDrive non démarré ?). Rien n'a été modifié.")
+
+        for dirpath, dirnames, filenames in os.walk(top, followlinks=False, onerror=on_error):
             dirnames[:] = sorted(d for d in dirnames if not d.startswith(IGNORED_PREFIXES))
             for name in sorted(filenames):
                 if name.startswith(IGNORED_PREFIXES):
@@ -119,11 +142,12 @@ class LocalFolderSource:
                 full = Path(dirpath) / name
                 if full.is_symlink():
                     continue  # jamais de sortie du périmètre autorisé
+                rel = full.relative_to(top).as_posix()
                 try:
                     st = full.stat()
                 except OSError:
+                    self.unreadable_files.append(rel)
                     continue
-                rel = full.relative_to(top).as_posix()
                 ext = PurePosixPath(name).suffix.lower()
                 mtime = datetime.fromtimestamp(st.st_mtime, timezone.utc).isoformat()
                 row = known.get(rel)

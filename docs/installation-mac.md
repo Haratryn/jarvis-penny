@@ -426,6 +426,7 @@ Bilan à noter : score sur 10, temps moyen par document et par question, limites
 | `penny: error: unrecognized arguments` sur une commande documentée | Ancienne version encore déployée | Comparer `penny --version` et `git log --oneline -1`, puis `git pull` et redéployer |
 | `sqlite3.OperationalError: database is locked` sur `penny status` pendant un scan | Les consultations écrivaient dans la base (corrigé le 18/11) | Redéployer ; les consultations sont désormais en lecture seule |
 | `Ollama injoignable … (HTTPError)` | Ollama répondait par une erreur, mal présentée (corrigé le 18/11) | Redéployer, puis `penny models check` donne la raison |
+| Inventaire « 0 fichiers … 5978 disparus » | Dossier devenu illisible pour penny, pris pour un dossier vide (défaut corrigé le 18/11) | Redéployer : l'inventaire refuse désormais de conclure et indique l'erreur ; les fichiers marqués à tort sont retrouvés avec leurs analyses au prochain inventaire réussi. Vérifier l'accès avec `penny onedrive check "<dossier>"` |
 | Un bloc de commandes collé derrière `sudo` n'affiche rien | La saisie du mot de passe avale les lignes suivantes | Une commande à la fois |
 
 ## Constats de sécurité (testés)
