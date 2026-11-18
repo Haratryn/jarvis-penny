@@ -130,9 +130,12 @@ class _Quit(Exception):
 CHOICES = {"a": "analyser", "i": "inventaire", "x": "ignorer"}
 
 
-def _ask(prompt: str, allowed: str) -> str:
+def _ask(prompt: str, allowed: str, default: str | None = None) -> str:
+    """Entrée seule = réponse par défaut (affichée en majuscule dans la question)."""
     while True:
         answer = input(prompt).strip().lower()[:1]
+        if not answer and default:
+            return default
         if answer in allowed:
             return answer
         print(f"  Réponse attendue : {', '.join(allowed)}")
@@ -156,8 +159,8 @@ def _review(conn, decisions, root: str, parent: str, export, revoir: bool) -> No
     for n, s in enumerate(subs, 1):
         if not revoir and decisions.for_folder(s["folder"]) != A_DECIDER:
             continue
-        c = _ask(f"Dossier {n} « {s['name']} » ({s['files']} fichiers) : [a]nalyser, [i]nventaire seul, "
-                 "[x] ignorer, [d]écider ses sous-dossiers, [p]lus tard, [q]uitter ? ", "aixdpq")
+        c = _ask(f"Dossier {n} « {s['name']} » ({s['files']} fichiers) : [A]nalyser (Entrée), [i]nventaire seul, "
+                 "[x] ignorer, [d]écider ses sous-dossiers, [p]lus tard, [q]uitter ? ", "aixdpq", default="a")
         if c == "q":
             raise _Quit
         if c in CHOICES:
@@ -167,8 +170,8 @@ def _review(conn, decisions, root: str, parent: str, export, revoir: bool) -> No
             _review(conn, decisions, root, s["folder"], export, revoir)
     loose_key = f"{parent}/x" if parent else "x"
     if loose["files"] and (revoir or decisions.for_file(loose_key) == A_DECIDER):
-        c = _ask(f"Les {loose['files']} fichiers posés directement dans « {title} » : [a]nalyser, "
-                 "[i]nventaire seul, [x] ignorer, [p]lus tard, [q]uitter ? ", "aixpq")
+        c = _ask(f"Les {loose['files']} fichiers posés directement dans « {title} » : [A]nalyser (Entrée), "
+                 "[i]nventaire seul, [x] ignorer, [p]lus tard, [q]uitter ? ", "aixpq", default="a")
         if c == "q":
             raise _Quit
         if c in CHOICES:
@@ -214,7 +217,7 @@ def cmd_dossiers(cfg: Config, args) -> None:
     try:
         if decisions.for_folder("") == "a_decider" or args.revoir:
             c = _ask("Pour le dossier entier : [a]nalyser tout, [i]nventaire seul, [x] ignorer, "
-                     "ou [d]écider sous-dossier par sous-dossier ? ", "aixd")
+                     "ou [D]écider sous-dossier par sous-dossier (Entrée) ? ", "aixd", default="d")
             if c in CHOICES:
                 decisions.set("", CHOICES[c])
                 export()

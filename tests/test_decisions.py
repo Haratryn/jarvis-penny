@@ -122,7 +122,7 @@ def test_revue_interactive(lf, monkeypatch, capsys):
         monkeypatch.setenv(key, value)
     # dossier entier : décider un par un ; Assurances analyser, Divers ignorer,
     # Maison : descendre (aucun sous-dossier) puis ses fichiers en inventaire, Voitures : plus tard
-    answers = iter(["d", "a", "x", "d", "i", "p"])
+    answers = iter(["", "", "x", "d", "i", "p"])  # Entrée = décider un par un, puis Entrée = analyser
     monkeypatch.setattr("builtins.input", lambda prompt="": next(answers))
     cli.main(["dossiers", ROOT])
     out = capsys.readouterr().out

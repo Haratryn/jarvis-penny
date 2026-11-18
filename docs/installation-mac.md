@@ -381,7 +381,8 @@ penny% penny dossiers "<dossier>"
 ```
 Penny inventorie (sans rien lire), affiche les sous-dossiers avec leur nombre de fichiers, leur
 taille, leurs types principaux et leur date la plus récente, puis demande :
-`[a]nalyser, [i]nventaire seul, [x] ignorer, [d]écider ses sous-dossiers, [p]lus tard, [q]uitter`.
+`[A]nalyser (Entrée), [i]nventaire seul, [x] ignorer, [d]écider ses sous-dossiers, [p]lus tard, [q]uitter`.
+Entrée seule = Analyser (pour le dossier entier, Entrée = décider sous-dossier par sous-dossier).
 Chaque réponse est enregistrée aussitôt : on peut s'arrêter et reprendre.
 
 - `penny dossiers "<dossier>" --revoir` : redemander aussi les dossiers déjà décidés ;
