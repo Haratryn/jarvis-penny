@@ -5,6 +5,7 @@ au même point, et un fichier déjà traité dans la même version n'est jamais 
 """
 from __future__ import annotations
 
+import inspect
 import json
 import re
 import sqlite3
@@ -16,6 +17,7 @@ from pathlib import Path, PurePosixPath
 import numpy as np
 
 from . import db
+from .decisions import IGNORE, Decisions, apply_scope
 from .extract import DOCLING_EXT, IMAGE_EXT, TEXT_EXT, Extractor, NoText, Unsupported
 from .llm import LLM, LLMRefused, LLMUnreachable
 from .onedrive import RemoteFile, Source
@@ -110,9 +112,15 @@ class Scanner:
 
     # --- Inventaire ---------------------------------------------------------------
     def inventory(self, root: str, report: ScanReport, accept_gone: bool = False) -> None:
-        files = self.source.list_files(root)
+        decisions = Decisions(self.conn, root)
+        if "decisions" in inspect.signature(self.source.list_files).parameters:
+            files = self.source.list_files(root, decisions=decisions)
+        else:  # source sans prise en charge des décisions (rclone) : filtrage après coup
+            files = [f for f in self.source.list_files(root) if decisions.for_file(f.path) != IGNORE]
         report.listed = len(files)
-        unreadable_dirs = getattr(self.source, "unreadable_dirs", []) or []
+        # Dossiers ignorés : jamais parcourus, donc leurs fichiers connus ne sont pas « disparus ».
+        unreadable_dirs = list(getattr(self.source, "unreadable_dirs", []) or [])
+        ignored_dirs = list(getattr(self.source, "ignored_dirs", []) or [])
         unreadable_files = set(getattr(self.source, "unreadable_files", []) or [])
         report.unreadable = len(unreadable_dirs) + len(unreadable_files)
 
@@ -121,8 +129,9 @@ class Scanner:
         active = self.conn.execute("SELECT id, path FROM items WHERE root = ? AND gone = 0", (root,)).fetchall()
 
         def unreadable(path: str) -> bool:
-            return path in unreadable_files or any(
-                d == "." or path == d or path.startswith(d.rstrip("/") + "/") for d in unreadable_dirs)
+            return path in unreadable_files or decisions.for_file(path) == IGNORE or any(
+                d == "." or path == d or path.startswith(d.rstrip("/") + "/")
+                for d in unreadable_dirs + ignored_dirs)
 
         to_gone = [r["id"] for r in active if r["id"] not in listed_ids and not unreadable(r["path"])]
         if active and not accept_gone and to_gone and (
@@ -154,14 +163,18 @@ class Scanner:
         for item_id in to_gone:
             report.gone += 1
             self.conn.execute("UPDATE items SET gone = 1 WHERE id = ?", (item_id,))
+        self.apply_decisions(root, decisions)
         self.conn.commit()
+
+    def apply_decisions(self, root: str, decisions: Decisions | None = None) -> None:
+        apply_scope(self.conn, root, decisions)
 
     # --- Traitement -----------------------------------------------------------------
     def pending(self, root: str) -> list[sqlite3.Row]:
         return self.conn.execute(
             """SELECT i.* , p.state, p.hash AS done_hash, p.attempts FROM items i
                LEFT JOIN processing p ON p.item_id = i.id
-               WHERE i.root = ? AND i.gone = 0
+               WHERE i.root = ? AND i.gone = 0 AND i.scope = 'analyser'
                  AND (p.item_id IS NULL OR p.hash != i.hash
                       OR (p.state NOT IN ('indexed','no_text','skipped')
                           AND NOT (p.state = 'error' AND p.attempts >= ?)))

@@ -11,6 +11,7 @@ compte `penny` ; Claude Code ne voit que des données inventées (voir `CLAUDE.m
 
 ```
 penny onedrive check              # accès au OneDrive local (ou connect|check avec rclone)
+penny dossiers "<dossier>"         # décider : analyser, inventaire seul, ignorer (rien n'est lu sans accord)
 penny scan "<dossier>" [--limit N] # inventaire puis analyse (reprise automatique)
 penny status [<dossier>]           # listés, analysés, sans texte, ignorés, erreurs
 penny docs [--type T] [--sans-texte]
@@ -27,7 +28,7 @@ Développement : `uv sync --group dev && uv run pytest` (faux OneDrive, faux mod
 |---|---|---|
 | Sources | `items` (identifiant OneDrive stable, chemin, empreinte) + copie locale | incrément 1 |
 | Mémoire extraite | `cards` (fiche par document), `chunks` (passages, plein texte, vecteurs), reliées à (identifiant, empreinte) | incrément 1 |
-| Corrections et décisions | journal séparé, indépendant du moteur | incrément 2 |
+| Corrections et décisions | décisions de dossiers (`folder_decisions` + `decisions/dossiers.md`) ; corrections : journal séparé, indépendant du moteur | dossiers : fait ; corrections : incrément 2 |
 | Engagements et preuves | à venir | — |
 
 ## Arborescence

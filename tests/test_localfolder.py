@@ -9,6 +9,7 @@ import pytest
 from conftest import FAKE_FILES, FakeLLM, states
 from penny import cli, db
 from penny.extract import LocalExtractor
+from penny.decisions import ANALYSE, Decisions
 from penny.localfolder import LocalFolderSource, SourceError
 from penny.pipeline import Scanner
 from penny.search import Searcher
@@ -31,6 +32,7 @@ def local(tmp_path):
     source = LocalFolderSource(base, conn)
     llm = FakeLLM()
     scanner = Scanner(conn, source, LocalExtractor(), llm, tmp_path / "data/sources", tmp_path / "data/markdown")
+    Decisions(conn, ROOT).set("", ANALYSE)
     yield type("Local", (), dict(base=base, top=top, conn=conn, source=source, llm=llm, scanner=scanner, tmp=tmp_path))
     conn.close()
 

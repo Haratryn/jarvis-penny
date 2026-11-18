@@ -32,7 +32,8 @@ REASON_LABELS = {
 
 
 def state_counts(conn: sqlite3.Connection, root: str | None = None) -> list[sqlite3.Row]:
-    where = "WHERE i.gone = 0" + (" AND i.root = ?" if root else "")
+    """États de traitement des fichiers des dossiers à analyser."""
+    where = "WHERE i.gone = 0 AND i.scope = 'analyser'" + (" AND i.root = ?" if root else "")
     return conn.execute(
         f"""SELECT i.root,
                    CASE WHEN p.hash = i.hash THEN p.state END AS state,
@@ -42,22 +43,37 @@ def state_counts(conn: sqlite3.Connection, root: str | None = None) -> list[sqli
             GROUP BY 1, 2, 3 ORDER BY 1, 2, 3""", [root] if root else []).fetchall()
 
 
+SCOPE_LABELS = {"analyser": "à analyser", "inventaire": "inventaire seul", "a_decider": "à décider",
+                "ignorer": "ignorés"}
+
+
 def status_text(conn: sqlite3.Connection, root: str | None = None) -> str:
-    rows = state_counts(conn, root)
-    if not rows:
+    roots = [r[0] for r in conn.execute(
+        "SELECT DISTINCT root FROM items" + (" WHERE root = ?" if root else "") + " ORDER BY root",
+        [root] if root else [])]
+    if not roots:
         return "Aucun dossier analysé. Lancer : penny scan \"<dossier>\""
-    lines, current = [], None
-    totals: dict[str, int] = {}
-    for r in rows:
-        if r["root"] != current:
-            current = r["root"]
-            listed = sum(x["n"] for x in rows if x["root"] == current)
-            gone = conn.execute("SELECT COUNT(*) FROM items WHERE root = ? AND gone = 1", (current,)).fetchone()[0]
-            lines.append(f"« {current} » : {listed} fichiers listés" + (f", {gone} disparus de OneDrive" if gone else ""))
-        label = STATE_LABELS.get(r["state"], r["state"])
-        reason = f" — {REASON_LABELS.get(r['reason'], r['reason'])}" if r["reason"] and r["state"] in ("skipped", "error", "no_text") else ""
-        lines.append(f"    {r['n']:>6}  {label}{reason}")
-        totals[label] = totals.get(label, 0) + r["n"]
+    lines = []
+    for current in roots:
+        listed, gone = conn.execute(
+            "SELECT SUM(gone = 0), SUM(gone = 1) FROM items WHERE root = ?", (current,)).fetchone()
+        lines.append(f"« {current} » : {listed or 0} fichiers listés"
+                     + (f", {gone} disparus de OneDrive" if gone else ""))
+        scopes = {r[0]: r[1] for r in conn.execute(
+            "SELECT scope, COUNT(*) FROM items WHERE root = ? AND gone = 0 GROUP BY scope", (current,))}
+        lines.append("  Décisions : " + ", ".join(
+            f"{scopes[k]} {SCOPE_LABELS[k]}" for k in ("analyser", "inventaire", "a_decider", "ignorer") if scopes.get(k)))
+        if scopes.get("a_decider"):
+            lines.append(f"  → {scopes['a_decider']} fichiers dans des dossiers à décider : "
+                         f"penny dossiers \"{current}\"")
+        rows = [r for r in state_counts(conn, current)]
+        if rows:
+            lines.append("  Dossiers à analyser :")
+        for r in rows:
+            label = STATE_LABELS.get(r["state"], r["state"])
+            reason = (f" — {REASON_LABELS.get(r['reason'], r['reason'])}"
+                      if r["reason"] and r["state"] in ("skipped", "error", "no_text") else "")
+            lines.append(f"    {r['n']:>6}  {label}{reason}")
     return "\n".join(lines)
 
 

@@ -369,6 +369,31 @@ En cas d'`ÉCHEC`, la ligne donne la raison d'Ollama (mémoire insuffisante, mod
 Rappel : l'Ollama de votre compte (port 11434) et celui de `penny` se partagent les 16 Go ;
 quitter l'appli Ollama de votre compte pendant les analyses.
 
+### 11.3 ter Décider quels dossiers analyser
+
+**Penny ne lit rien dans un dossier sans votre accord.** Pour chaque dossier : *Analyser* (lu et
+analysé), *Inventaire seul* (noms, tailles, dates : à archiver ou sans intérêt, rien n'est lu),
+*Ignorer* (Penny ne le parcourt même pas). Sans décision : *à décider*, rien n'est lu.
+Une décision vaut pour les sous-dossiers, sauf décision plus précise.
+
+```
+penny% penny dossiers "<dossier>"
+```
+Penny inventorie (sans rien lire), affiche les sous-dossiers avec leur nombre de fichiers, leur
+taille, leurs types principaux et leur date la plus récente, puis demande :
+`[a]nalyser, [i]nventaire seul, [x] ignorer, [d]écider ses sous-dossiers, [p]lus tard, [q]uitter`.
+Chaque réponse est enregistrée aussitôt : on peut s'arrêter et reprendre.
+
+- `penny dossiers "<dossier>" --revoir` : redemander aussi les dossiers déjà décidés ;
+- `penny dossiers "<dossier>" --sous "<sous-dossier>"` : commencer plus bas ;
+- `penny dossiers "<dossier>" --liste` : décisions enregistrées ;
+- `penny dossiers "<dossier>" --decider "<sous-dossier>" ignorer` (ou `analyser`, `inventaire`,
+  `annuler`) : sans question.
+
+Journal lisible des décisions : `/Users/penny/penny-data/decisions/dossiers.md`.
+Changer d'avis ne supprime rien : un dossier repassé en *Analyser* retrouve ses analyses.
+Une décision est liée au chemin : un dossier renommé dans OneDrive sera redemandé.
+
 ### 11.4 Premier passage
 
 **Avant de lancer** : écrire pour vous seul (pas dans le dépôt, pas à Claude) **10 questions** dont

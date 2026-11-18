@@ -13,6 +13,7 @@ import pytest
 from penny import db
 from penny.extract import LocalExtractor
 from penny.onedrive import RemoteFile
+from penny.decisions import ANALYSE, Decisions
 from penny.pipeline import Scanner
 
 ROOT = "Documents/Administratif"
@@ -115,6 +116,7 @@ def env(tmp_path):
     llm = FakeLLM()
     conn = db.connect(tmp_path / "data" / "penny.sqlite")
     scanner = Scanner(conn, source, LocalExtractor(), llm, tmp_path / "data/sources", tmp_path / "data/markdown")
+    Decisions(conn, ROOT).set("", ANALYSE)
     yield type("Env", (), dict(source=source, llm=llm, conn=conn, scanner=scanner, tmp=tmp_path))
     conn.close()
     shutil.rmtree(tmp_path, ignore_errors=True)

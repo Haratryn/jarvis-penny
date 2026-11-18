@@ -49,9 +49,10 @@ def fts_query(question: str) -> str:
 def perimeter(conn: sqlite3.Connection, root: str | None) -> str:
     where, args = ("WHERE i.gone = 0" + (" AND i.root = ?" if root else "")), ([root] if root else [])
     rows = conn.execute(
-        f"""SELECT i.root, COUNT(*) AS listed,
-                   SUM(p.state = 'indexed' AND p.hash = i.hash) AS indexed,
-                   SUM(p.state = 'no_text' AND p.hash = i.hash) AS no_text
+        f"""SELECT i.root, SUM(i.scope = 'analyser') AS listed,
+                   SUM(i.scope = 'analyser' AND p.state = 'indexed' AND p.hash = i.hash) AS indexed,
+                   SUM(i.scope = 'analyser' AND p.state = 'no_text' AND p.hash = i.hash) AS no_text,
+                   SUM(i.scope != 'analyser') AS outside
             FROM items i LEFT JOIN processing p ON p.item_id = i.id {where} GROUP BY i.root""",
         args).fetchall()
     if not rows:
@@ -61,7 +62,9 @@ def perimeter(conn: sqlite3.Connection, root: str | None) -> str:
         pending = r["listed"] - (r["indexed"] or 0)
         parts.append(f"« {r['root']} » : {r['indexed'] or 0} documents analysés sur {r['listed']}"
                      + (f" ({pending} non analysés, dont {r['no_text']} sans texte en attente d'OCR)"
-                        if pending else ""))
+                        if pending else "")
+                     + (f" ; {r['outside']} fichiers non consultés (dossiers ignorés, en inventaire seul "
+                        "ou à décider)" if r["outside"] else ""))
     return "Périmètre : " + " ; ".join(parts) + ". Ce qui n'a pas été analysé peut exister ailleurs."
 
 
@@ -71,7 +74,8 @@ class Searcher:
 
     def _scope(self, root: str | None) -> tuple[str, list]:
         sql = ("FROM chunks c JOIN items i ON i.id = c.item_id JOIN processing p ON p.item_id = i.id "
-               "WHERE i.gone = 0 AND p.state = 'indexed' AND p.hash = c.hash AND c.hash = i.hash")
+               "WHERE i.gone = 0 AND i.scope = 'analyser' AND p.state = 'indexed' "
+               "AND p.hash = c.hash AND c.hash = i.hash")
         return (sql + " AND i.root = ?", [root]) if root else (sql, [])
 
     def retrieve(self, question: str, root: str | None = None, k: int = TOP_K) -> list[Passage]:
@@ -133,9 +137,9 @@ class Searcher:
 
 def cards_listing(conn: sqlite3.Connection, root: str | None, doc_type: str | None, no_text: bool,
                   state: str | None = None, ext: str | None = None) -> list[dict]:
-    sql = ("SELECT i.root, i.path, i.ext, p.state, p.reason, p.detail, c.doc_type, c.doc_date, c.title, c.parties, c.subject"
+    sql = ("SELECT i.root, i.path, i.ext, i.scope, p.state, p.reason, p.detail, c.doc_type, c.doc_date, c.title, c.parties, c.subject"
            " FROM items i LEFT JOIN processing p ON p.item_id = i.id AND p.hash = i.hash"
-           " LEFT JOIN cards c ON c.item_id = i.id AND c.hash = i.hash WHERE i.gone = 0")
+           " LEFT JOIN cards c ON c.item_id = i.id AND c.hash = i.hash WHERE i.gone = 0 AND i.scope != 'ignorer'")
     args: list = []
     if root:
         sql += " AND i.root = ?"

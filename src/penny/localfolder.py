@@ -120,8 +120,11 @@ class LocalFolderSource:
                 pass  # fichier non disponible localement : il sera signalé en erreur au traitement
         return f"meta:{size}:{mtime}"
 
-    def list_files(self, root: str) -> list[RemoteFile]:
+    def list_files(self, root: str, decisions=None) -> list[RemoteFile]:
+        """decisions (penny.decisions.Decisions) : les dossiers ignorés ne sont pas parcourus, et
+        l'empreinte (qui demande de lire le fichier) n'est calculée que pour les fichiers à analyser."""
         top = self._root_dir(root)
+        self.ignored_dirs: list[str] = []
         # Tous les fichiers connus, y compris ceux marqués disparus : un fichier qui réapparaît
         # au même chemin retrouve son identifiant et ses analyses.
         known = {r["path"]: r for r in self.conn.execute(
@@ -153,6 +156,17 @@ class LocalFolderSource:
 
         for dirpath, dirnames, filenames in os.walk(top, followlinks=False, onerror=on_error):
             dirnames[:] = sorted(d for d in dirnames if not d.startswith(IGNORED_PREFIXES))
+            if decisions is not None:
+                here = Path(dirpath).relative_to(top).as_posix()
+                here = "" if here == "." else here
+                kept = []
+                for d in dirnames:
+                    sub = f"{here}/{d}" if here else d
+                    if decisions.is_ignored_dir(sub):
+                        self.ignored_dirs.append(sub)   # jamais parcouru
+                    else:
+                        kept.append(d)
+                dirnames[:] = kept
             for name in sorted(filenames):
                 if name.startswith(IGNORED_PREFIXES):
                     continue
@@ -167,14 +181,24 @@ class LocalFolderSource:
                     continue
                 ext = PurePosixPath(name).suffix.lower()
                 mtime = datetime.fromtimestamp(st.st_mtime, timezone.utc).isoformat()
+                readable = decisions is None or decisions.for_file(rel) == "analyser"
+                if decisions is not None and decisions.for_file(rel) == "ignorer":
+                    continue  # fichiers posés dans un dossier « ignorer (fichiers seulement) »
+
+                def fingerprint() -> str:
+                    if readable:
+                        return self._hash(full, ext, st.st_size, mtime)
+                    return f"meta:{st.st_size}:{mtime}"  # rien n'est lu
+
                 row = known.get(rel)
                 if row is not None:
                     missing.pop(rel, None)
                     same = row["size"] == st.st_size and row["mtime"] == mtime
-                    hash_ = row["hash"] if same else self._hash(full, ext, st.st_size, mtime)
+                    reuse = same and not (readable and row["hash"].startswith("meta:"))
+                    hash_ = row["hash"] if reuse else fingerprint()
                     found.append(RemoteFile(row["id"], rel, name, st.st_size, mtime, hash_))
                 else:
-                    unknown.append((rel, name, st.st_size, mtime, self._hash(full, ext, st.st_size, mtime)))
+                    unknown.append((rel, name, st.st_size, mtime, fingerprint()))
 
         by_hash = {}
         for row in missing.values():
@@ -196,4 +220,4 @@ class LocalFolderSource:
     def check(self) -> str:
         if not os.access(self.base, os.X_OK):
             raise SourceError("PENNY_LOCAL_ROOT inaccessible pour penny (droits de passage manquants)")
-        return f"Dossier OneDrive local accessible (lecture seule, sans réseau)."
+        return "Dossier OneDrive local accessible (lecture seule, sans réseau)."

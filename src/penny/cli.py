@@ -111,12 +111,121 @@ def cmd_scan(cfg: Config, args) -> None:
         progress.finish()
     print(f"Inventaire : {rep.listed} fichiers ({rep.new} nouveaux, {rep.changed} modifiés, "
           f"{rep.moved} déplacés ou renommés, {rep.gone} disparus)")
+    from .decisions import scope_counts
+    to_decide = scope_counts(conn, args.root).get("a_decider", 0)
+    if to_decide:
+        print(f"{to_decide} fichiers dans des dossiers à décider, non analysés : penny dossiers \"{args.root}\"")
     if rep.unreadable:
         print(f"Attention : {rep.unreadable} fichiers ou dossiers illisibles par penny (non comptés comme "
               "disparus) — voir penny onedrive check")
     print(f"Ce passage : {rep.processed} analysés, {rep.no_text} sans texte, {rep.skipped} ignorés, "
           f"{rep.errors} en erreur" + (f" {rep.error_codes}" if rep.error_codes else ""))
     print(f"Reste à traiter : {rep.remaining}" + (" — relancer la même commande pour continuer" if rep.remaining else ""))
+
+
+class _Quit(Exception):
+    pass
+
+
+CHOICES = {"a": "analyser", "i": "inventaire", "x": "ignorer"}
+
+
+def _ask(prompt: str, allowed: str) -> str:
+    while True:
+        answer = input(prompt).strip().lower()[:1]
+        if answer in allowed:
+            return answer
+        print(f"  Réponse attendue : {', '.join(allowed)}")
+
+
+def _review(conn, decisions, root: str, parent: str, export, revoir: bool) -> None:
+    from .decisions import A_DECIDER, LABELS, folder_stats, human_size, norm
+    subs, loose = folder_stats(conn, root, parent)
+    title = parent or "(dossier entier)"
+    print(f"\n« {title} »")
+    print(f"  {'N°':>3}  {'Sous-dossier':<34} {'Fichiers':>8} {'Taille':>9}  {'Types principaux':<28} {'Récent':<8} Décision")
+    for n, s in enumerate(subs, 1):
+        explicit = decisions.full.get(norm(s["folder"]))
+        effective = decisions.for_folder(s["folder"])
+        shown = LABELS[effective] + ("" if explicit or effective == A_DECIDER else " (hérité)")
+        print(f"  {n:>3}  {s['name'][:34]:<34} {s['files']:>8} {human_size(s['size']):>9}  "
+              f"{s['types'][:28]:<28} {s['latest']:<8} {shown}")
+    if loose["files"]:
+        print(f"  {'':>3}  {'(fichiers posés ici)':<34} {loose['files']:>8} {human_size(loose['size']):>9}  "
+              f"{loose['types'][:28]:<28} {loose['latest']:<8} {LABELS[decisions.for_file(f'{parent}/x' if parent else 'x')]}")
+    for n, s in enumerate(subs, 1):
+        if not revoir and decisions.for_folder(s["folder"]) != A_DECIDER:
+            continue
+        c = _ask(f"Dossier {n} « {s['name']} » ({s['files']} fichiers) : [a]nalyser, [i]nventaire seul, "
+                 "[x] ignorer, [d]écider ses sous-dossiers, [p]lus tard, [q]uitter ? ", "aixdpq")
+        if c == "q":
+            raise _Quit
+        if c in CHOICES:
+            decisions.set(s["folder"], CHOICES[c])
+            export()
+        elif c == "d":
+            _review(conn, decisions, root, s["folder"], export, revoir)
+    loose_key = f"{parent}/x" if parent else "x"
+    if loose["files"] and (revoir or decisions.for_file(loose_key) == A_DECIDER):
+        c = _ask(f"Les {loose['files']} fichiers posés directement dans « {title} » : [a]nalyser, "
+                 "[i]nventaire seul, [x] ignorer, [p]lus tard, [q]uitter ? ", "aixpq")
+        if c == "q":
+            raise _Quit
+        if c in CHOICES:
+            decisions.set(parent, CHOICES[c], files_only=True)
+            export()
+
+
+def cmd_dossiers(cfg: Config, args) -> None:
+    """Décider, dossier par dossier, ce que Penny peut analyser. Rien n'est lu pour décider :
+    les chiffres affichés viennent du seul inventaire (noms, tailles, dates)."""
+    from .decisions import LABELS, Decisions, apply_scope, export_markdown, norm
+    conn = db.connect(cfg.db_path)
+    export_path = cfg.data_dir / "decisions" / "dossiers.md"
+    decisions = Decisions(conn, args.root)
+
+    def export() -> None:
+        apply_scope(conn, args.root, decisions)
+        export_markdown(conn, export_path)
+
+    if args.decider:
+        folder, choice = args.decider
+        choice = {"annuler": None, "analyser": "analyser", "inventaire": "inventaire", "ignorer": "ignorer"}.get(choice, "?")
+        if choice == "?":
+            sys.exit("Décision attendue : analyser, inventaire, ignorer ou annuler")
+        decisions.set(folder, choice, files_only=args.fichiers_seulement)
+        export()
+        print(f"« {norm(folder) or '(dossier entier)'} » : {LABELS[choice] if choice else 'décision annulée'}")
+        return
+    if args.liste:
+        rows = conn.execute("SELECT folder, files_only, decision, decided_at FROM folder_decisions WHERE root = ? "
+                            "ORDER BY folder", (args.root,)).fetchall()
+        for r in rows:
+            print(f"  {LABELS[r['decision']]:<16} {r['folder'] or '(dossier entier)'}"
+                  + (" (fichiers seulement)" if r["files_only"] else "") + f"  — {r['decided_at'][:10]}")
+        print(f"{len(rows)} décisions. Journal lisible : {export_path}")
+        return
+
+    print(f"Inventaire de « {args.root} » (noms, tailles, dates : rien n'est lu)…")
+    scanner = Scanner(conn, _source(cfg, conn), LocalExtractor(), None, cfg.cache_dir, cfg.markdown_dir,
+                      cfg.max_file_mb)
+    from .pipeline import ScanReport
+    scanner.inventory(args.root, ScanReport(), accept_gone=False)
+    try:
+        if decisions.for_folder("") == "a_decider" or args.revoir:
+            c = _ask("Pour le dossier entier : [a]nalyser tout, [i]nventaire seul, [x] ignorer, "
+                     "ou [d]écider sous-dossier par sous-dossier ? ", "aixd")
+            if c in CHOICES:
+                decisions.set("", CHOICES[c])
+                export()
+                print("Décision enregistrée. Pour affiner plus bas : penny dossiers \"<dossier>\" --revoir")
+                return
+        _review(conn, decisions, args.root, args.sous or "", export, args.revoir)
+    except (_Quit, EOFError, KeyboardInterrupt):
+        print("\nArrêt : les décisions déjà prises sont enregistrées.")
+    export()
+    print(f"\nJournal des décisions : {export_path}")
+    print(status_text(conn, args.root))
 
 
 def cmd_status(cfg: Config, args) -> None:
@@ -205,6 +314,16 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--confirmer-disparitions", action="store_true",
                    help="accepter qu'une grande partie des fichiers connus ait disparu")
     p.set_defaults(func=cmd_scan)
+    p = sub.add_parser("dossiers", help="décider quels dossiers analyser, garder en inventaire ou ignorer")
+    p.add_argument("root", help="dossier OneDrive (le même que pour penny scan)")
+    p.add_argument("--sous", help="commencer la revue à ce sous-dossier")
+    p.add_argument("--revoir", action="store_true", help="redemander aussi les dossiers déjà décidés")
+    p.add_argument("--liste", action="store_true", help="afficher les décisions enregistrées")
+    p.add_argument("--decider", nargs=2, metavar=("SOUS_DOSSIER", "DECISION"),
+                   help="décider sans question : analyser, inventaire, ignorer ou annuler ('' = dossier entier)")
+    p.add_argument("--fichiers-seulement", action="store_true",
+                   help="avec --decider : seulement les fichiers posés directement dans ce dossier")
+    p.set_defaults(func=cmd_dossiers)
     p = sub.add_parser("status", help="état de l'analyse")
     p.add_argument("root", nargs="?")
     p.set_defaults(func=cmd_status)

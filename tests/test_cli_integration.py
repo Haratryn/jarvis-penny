@@ -84,6 +84,7 @@ def cli_env(tmp_path, monkeypatch):
 
 
 def test_parcours_complet(cli_env, capsys):
+    cli.main(["dossiers", ROOT, "--decider", "", "analyser"])
     cli.main(["scan", ROOT, "--limit", "4"])
     out = capsys.readouterr().out
     assert "9 fichiers" in out and "Reste à traiter : 3" in out  # 2 classés d'après le format + 4 analysés
@@ -132,6 +133,7 @@ def test_refus_d_ollama_explique_et_arrete_le_scan(cli_env, monkeypatch, capsys)
             raise llm_mod.LLMRefused(f"Ollama a refusé la requête {path} pour le modèle {payload['model']} "
                                      f"(HTTP {e.code}) : model requires more system memory") from e
     monkeypatch.setattr(llm_mod.Ollama, "_post", refuse)
+    cli.main(["dossiers", ROOT, "--decider", "", "analyser"])
     with pytest.raises(SystemExit) as exc:
         cli.main(["scan", ROOT])
     assert "HTTP 500" in str(exc.value) and "memory" in str(exc.value)
@@ -164,6 +166,7 @@ def test_ollama_remonte_la_raison_du_refus():
 
 
 def test_docs_par_extension(cli_env, capsys):
+    cli.main(["dossiers", ROOT, "--decider", "", "analyser"])
     cli.main(["scan", ROOT])
     capsys.readouterr()
     cli.main(["docs", "--ignores"])
