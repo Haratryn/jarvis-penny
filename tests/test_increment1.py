@@ -33,7 +33,9 @@ def test_relance_ne_refait_rien(env):
 
 def test_limite_puis_reprise(env):
     rep = env.scanner.scan(ROOT, limit=3)
-    assert rep.processed + rep.no_text + rep.skipped == 3 and rep.remaining == 6
+    # --limit ne compte que les documents à lire : image et zip sont classés hors limite
+    assert rep.skipped == 1 and rep.no_text >= 1 and rep.processed + rep.no_text + rep.skipped == 5
+    assert rep.remaining == 4
     rep = env.scanner.scan(ROOT)
     assert rep.remaining == 0 and len(env.source.downloads) == 7  # rien téléchargé deux fois
 
@@ -160,8 +162,9 @@ def test_avancement_sans_nom_de_fichier(env):
     env.scanner.scan(ROOT, progress=progress)
     progress.finish()
     text = out.getvalue()
-    assert "À analyser ce passage : 9 fichiers" in text
-    assert "[9/9]" in text and "analysés 6, sans texte 2, ignorés 1, erreurs 0" in text
+    assert "Classés d'après leur format, sans lecture : 2 fichiers" in text
+    assert "À analyser ce passage : 7 documents" in text
+    assert "[7/7]" in text and "analysés 6, sans texte 1, ignorés 0, erreurs 0" in text
     assert "moyenne" in text and "reste" in text and "Durée du passage" in text
     for _, (path, _) in env.source.files.items():
         assert path.split("/")[-1] not in text, "aucun nom de fichier dans l'avancement"
@@ -172,7 +175,7 @@ def test_avancement_avec_limite(env):
     from penny.progress import Progress
     out = io.StringIO()
     env.scanner.scan(ROOT, limit=3, progress=Progress(stream=out, every=1))
-    assert "À analyser ce passage : 3 fichiers (sur 9 en attente)" in out.getvalue()
+    assert "À analyser ce passage : 3 documents (sur 7 en attente)" in out.getvalue()
 
 
 def test_consultation_pendant_un_scan(env, tmp_path):

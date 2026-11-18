@@ -34,12 +34,27 @@ def meaningful(text: str) -> bool:
     return len(cleaned) >= MIN_TEXT_CHARS
 
 
+def quiet_libraries() -> None:
+    """Masque barres de progression et avertissements des bibliothèques d'IA."""
+    import logging
+    import os
+    import warnings
+    for key, value in {"TQDM_DISABLE": "1", "HF_HUB_DISABLE_PROGRESS_BARS": "1",
+                       "TRANSFORMERS_VERBOSITY": "error", "TORCH_CPP_LOG_LEVEL": "ERROR",
+                       "TOKENIZERS_PARALLELISM": "false"}.items():
+        os.environ.setdefault(key, value)
+    warnings.filterwarnings("ignore")
+    for name in ("docling", "torch", "transformers", "huggingface_hub", "rapidocr", "easyocr"):
+        logging.getLogger(name).setLevel(logging.ERROR)
+
+
 class LocalExtractor:
     def __init__(self) -> None:
         self._converter = None
 
     def _docling(self):
         if self._converter is None:
+            quiet_libraries()
             try:
                 from docling.datamodel.base_models import InputFormat
                 from docling.datamodel.pipeline_options import PdfPipelineOptions

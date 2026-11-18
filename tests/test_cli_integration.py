@@ -86,7 +86,7 @@ def cli_env(tmp_path, monkeypatch):
 def test_parcours_complet(cli_env, capsys):
     cli.main(["scan", ROOT, "--limit", "4"])
     out = capsys.readouterr().out
-    assert "9 fichiers" in out and "Reste à traiter : 5" in out
+    assert "9 fichiers" in out and "Reste à traiter : 3" in out  # 2 classés d'après le format + 4 analysés
     cli.main(["scan", ROOT])
     assert "Reste à traiter : 0" in capsys.readouterr().out
     cli.main(["status"])

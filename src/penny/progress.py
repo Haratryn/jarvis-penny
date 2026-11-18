@@ -39,10 +39,13 @@ class Progress:
         self.doc_seconds: list[float] = []  # durée des documents réellement analysés
         self._doc_start = 0.0
 
-    def planned(self, pending: int, limit: int | None) -> None:
+    def planned(self, pending: int, limit: int | None, quick: int = 0) -> None:
         self.total = pending if limit is None else min(pending, limit)
         self.start = time.monotonic()
-        print(f"À analyser ce passage : {self.total} fichiers (sur {pending} en attente)", file=self.stream)
+        if quick:
+            print(f"Classés d'après leur format, sans lecture : {quick} fichiers (images, formats non pris en "
+                  "charge, trop volumineux)", file=self.stream)
+        print(f"À analyser ce passage : {self.total} documents (sur {pending} en attente)", file=self.stream)
 
     def file_start(self, n: int, ext: str) -> None:
         self.n, self.ext, self.step = n, ext or "?", ""

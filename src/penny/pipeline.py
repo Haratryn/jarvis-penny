@@ -183,6 +183,16 @@ class Scanner:
         self.conn.execute("INSERT INTO timings(step, seconds, at) VALUES (?,?,?)",
                           (step, time.monotonic() - start, now()))
 
+    def quick_decision(self, row: sqlite3.Row) -> tuple[str, str] | None:
+        """État final décidable sans ouvrir le fichier, ou None s'il faut l'analyser."""
+        if row["ext"] in IMAGE_EXT:
+            return "no_text", "image"
+        if row["ext"] not in TEXT_EXT | DOCLING_EXT:
+            return "skipped", "format_non_pris_en_charge"
+        if row["size"] > self.max_bytes:
+            return "skipped", "trop_volumineux"
+        return None
+
     def process(self, root: str, row: sqlite3.Row) -> str:
         item_id, hash_ = row["id"], row["hash"]
         proc = self.conn.execute("SELECT * FROM processing WHERE item_id = ?", (item_id,)).fetchone()
@@ -289,13 +299,30 @@ class Scanner:
         report = ScanReport()
         self.inventory(root, report, accept_gone)
         todo = self.pending(root)
+        # 1. Décisions instantanées d'après l'extension ou la taille (rien n'est lu) :
+        #    traitées toutes d'un coup, elles ne comptent pas dans --limit.
+        heavy = []
+        for row in todo:
+            quick = self.quick_decision(row)
+            if quick is None:
+                heavy.append(row)
+                continue
+            state, reason = quick
+            self._set_state(row["id"], row["hash"], state, reason)
+            if state == "no_text":
+                report.no_text += 1
+            else:
+                report.skipped += 1
+        # 2. Documents à lire et analyser : c'est eux que --limit et l'avancement comptent.
         self.progress = progress
         if progress is not None:
-            progress.planned(len(todo), limit)
+            progress.planned(len(heavy), limit, quick=len(todo) - len(heavy))
         refused_in_a_row = 0
-        for n, row in enumerate(todo):
-            if limit is not None and report.processed + report.no_text + report.skipped + report.errors >= limit:
+        done = 0
+        for n, row in enumerate(heavy):
+            if limit is not None and done >= limit:
                 break
+            done += 1
             if progress is not None:
                 progress.file_start(n + 1, row["ext"])
             try:
