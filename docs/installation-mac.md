@@ -346,6 +346,17 @@ Penny rappelle les réponses à donner à l'assistant rclone (nom `penny-onedriv
 configuration chiffrée). Limite : Microsoft ne propose aucun droit limité à un dossier pour un
 compte personnel ; le jeton peut lire tout le OneDrive.
 
+### 11.3 bis Tester les modèles
+
+```
+$ su - penny -c 'penny models check'
+```
+Teste les vecteurs, la fiche JSON et une réponse avec un **texte inventé** : la sortie peut être
+transmise à Claude. Attendu : trois lignes `ok` avec leur durée, puis `Modèles OK.`
+En cas d'`ÉCHEC`, la ligne donne la raison d'Ollama (mémoire insuffisante, modèle absent…).
+Rappel : l'Ollama de votre compte (port 11434) et celui de `penny` se partagent les 16 Go ;
+quitter l'appli Ollama de votre compte pendant les analyses.
+
 ### 11.4 Premier passage
 
 **Avant de lancer** : écrire pour vous seul (pas dans le dépôt, pas à Claude) **10 questions** dont
@@ -412,6 +423,7 @@ Bilan à noter : score sur 10, temps moyen par document et par question, limites
 | Refus « Penny doit tourner sous le compte penny » alors qu'on est sous `su - penny` | Le garde-fou lisait `USER`/`LOGNAME` (corrigé le 18/11 : compte réel du processus) | Redéployer |
 | `penny: error: unrecognized arguments` sur une commande documentée | Ancienne version encore déployée | Comparer `penny --version` et `git log --oneline -1`, puis `git pull` et redéployer |
 | `sqlite3.OperationalError: database is locked` sur `penny status` pendant un scan | Les consultations écrivaient dans la base (corrigé le 18/11) | Redéployer ; les consultations sont désormais en lecture seule |
+| `Ollama injoignable … (HTTPError)` | Ollama répondait par une erreur, mal présentée (corrigé le 18/11) | Redéployer, puis `penny models check` donne la raison |
 | Un bloc de commandes collé derrière `sudo` n'affiche rien | La saisie du mot de passe avale les lignes suivantes | Une commande à la fois |
 
 ## Constats de sécurité (testés)

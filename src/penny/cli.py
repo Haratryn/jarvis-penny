@@ -143,6 +143,32 @@ def cmd_ask(cfg: Config, args) -> None:
     print(f"\n{ans.perimeter}")
 
 
+def cmd_models_check(cfg: Config, args) -> None:
+    """Teste les modèles avec un texte INVENTÉ : la sortie peut être transmise à Claude."""
+    import time
+    from .pipeline import CARD_SCHEMA, CARD_SYSTEM
+    llm = _llm(cfg)
+    sample = ("Facture n° 2026-001 du 2026-03-15. Fournisseur : Société Exemple. "
+              "Client : Jean Fictif. Montant : 120,00 euros TTC.")
+    tests = [
+        (f"vecteurs ({cfg.embed_model})", lambda: llm.embed([sample]).shape[1]),
+        (f"fiche JSON ({cfg.llm_model})", lambda: llm.chat_json(
+            CARD_SYSTEM, f"Nom du fichier : exemple.pdf\n\n--- Début du document ---\n{sample}\n--- Fin ---",
+            CARD_SCHEMA).get("doc_type")),
+        (f"réponse ({cfg.llm_model})", lambda: llm.chat("Réponds en un mot.", "Dis OK.")[:20]),
+    ]
+    failed = False
+    for label, test in tests:
+        t = time.monotonic()
+        try:
+            result = test()
+            print(f"  ok     {label:<32} {time.monotonic() - t:5.1f} s  → {result}")
+        except LLMError as exc:
+            failed = True
+            print(f"  ÉCHEC  {label:<32} {exc}")
+    print("Modèles OK." if not failed else "Modèles en échec : voir les lignes ci-dessus.")
+
+
 def cmd_diag(cfg: Config, args) -> None:
     print(diag_text(db.connect(cfg.db_path, readonly=True), cfg.llm_model, cfg.embed_model))
 
@@ -173,6 +199,9 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("question")
     p.add_argument("--root", help="limiter à un dossier analysé")
     p.set_defaults(func=cmd_ask)
+    mo = sub.add_parser("models", help="modèles locaux (Ollama)")
+    mo_sub = mo.add_subparsers(dest="action", required=True)
+    mo_sub.add_parser("check", help="tester les modèles avec un texte inventé").set_defaults(func=cmd_models_check)
     sub.add_parser("diag", help="rapport ANONYMISÉ (le seul à transmettre à Claude)").set_defaults(func=cmd_diag)
 
     args = parser.parse_args(argv)

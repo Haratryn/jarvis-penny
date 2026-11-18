@@ -23,6 +23,14 @@ class LLMError(RuntimeError):
     pass
 
 
+class LLMUnreachable(LLMError):
+    """Ollama ne répond pas du tout : inutile de continuer le scan."""
+
+
+class LLMRefused(LLMError):
+    """Ollama a répondu par une erreur (mémoire, modèle absent, option refusée…)."""
+
+
 class Ollama:
     def __init__(self, url: str, model: str, embed_model: str, timeout: int = 600):
         host = urlparse(url).hostname
@@ -37,8 +45,17 @@ class Ollama:
         try:
             with urllib.request.urlopen(req, timeout=self.timeout) as resp:
                 return json.loads(resp.read())
-        except urllib.error.URLError as exc:
-            raise LLMError(f"Ollama injoignable sur {self.url} ({exc.__class__.__name__})") from exc
+        except urllib.error.HTTPError as exc:
+            # Ollama a répondu : on remonte sa raison (message technique, sans contenu de document).
+            try:
+                reason = json.loads(exc.read() or b"{}").get("error", "")
+            except (ValueError, OSError):
+                reason = ""
+            model = payload.get("model", "?")
+            raise LLMRefused(f"Ollama a refusé la requête {path} pour le modèle {model} "
+                             f"(HTTP {exc.code}) : {str(reason)[:300] or 'raison non précisée'}") from exc
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
+            raise LLMUnreachable(f"Ollama injoignable sur {self.url} ({exc.__class__.__name__})") from exc
 
     def embed(self, texts: list[str]) -> np.ndarray:
         out = self._post("/api/embed", {"model": self.embed_model, "input": texts})

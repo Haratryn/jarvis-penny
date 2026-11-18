@@ -110,3 +110,54 @@ def test_refus_hors_compte_penny(monkeypatch):
     with pytest.raises(SystemExit) as exc:
         cli.main(["status"])
     assert "penny" in str(exc.value)
+
+
+def test_models_check_avec_texte_invente(cli_env, capsys):
+    cli.main(["models", "check"])
+    out = capsys.readouterr().out
+    assert out.count("ok ") == 3 and "Modèles OK." in out
+
+
+def test_refus_d_ollama_explique_et_arrete_le_scan(cli_env, monkeypatch, capsys):
+    """Constaté sur le Mac : HTTPError présenté comme « injoignable » ; il faut la raison d'Ollama."""
+    import penny.llm as llm_mod
+    import io, urllib.error
+
+    def refuse(self, path, payload):
+        exc = urllib.error.HTTPError(self.url + path, 500, "err", {},
+                                     io.BytesIO(b'{"error":"model requires more system memory"}'))
+        try:
+            raise exc
+        except urllib.error.HTTPError as e:
+            raise llm_mod.LLMRefused(f"Ollama a refusé la requête {path} pour le modèle {payload['model']} "
+                                     f"(HTTP {e.code}) : model requires more system memory") from e
+    monkeypatch.setattr(llm_mod.Ollama, "_post", refuse)
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["scan", ROOT])
+    assert "HTTP 500" in str(exc.value) and "memory" in str(exc.value)
+
+
+def test_ollama_remonte_la_raison_du_refus():
+    from penny.llm import LLMRefused, LLMUnreachable, Ollama
+
+    class Refuse(BaseHTTPRequestHandler):
+        def do_POST(self):
+            self.rfile.read(int(self.headers["Content-Length"]))
+            data = b'{"error":"model requires more system memory (5.6 GiB) than is available (3.1 GiB)"}'
+            self.send_response(500)
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+
+        def log_message(self, *args):
+            pass
+
+    server = HTTPServer(("127.0.0.1", 0), Refuse)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        with pytest.raises(LLMRefused, match=r"HTTP 500.*more system memory"):
+            Ollama(f"http://127.0.0.1:{server.server_port}", "qwen3:8b", "bge-m3").chat("s", "u")
+    finally:
+        server.shutdown()
+    with pytest.raises(LLMUnreachable):
+        Ollama("http://127.0.0.1:9", "m", "e", timeout=2).chat("s", "u")

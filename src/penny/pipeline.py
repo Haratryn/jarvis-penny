@@ -17,7 +17,7 @@ import numpy as np
 
 from . import db
 from .extract import DOCLING_EXT, IMAGE_EXT, TEXT_EXT, Extractor, NoText, Unsupported
-from .llm import LLM, LLMError
+from .llm import LLM, LLMRefused, LLMUnreachable
 from .onedrive import RemoteFile, Source
 
 CHUNK_CHARS = 1200
@@ -268,6 +268,7 @@ class Scanner:
         self.progress = progress
         if progress is not None:
             progress.planned(len(todo), limit)
+        refused_in_a_row = 0
         for n, row in enumerate(todo):
             if limit is not None and report.processed + report.no_text + report.skipped + report.errors >= limit:
                 break
@@ -285,9 +286,13 @@ class Scanner:
                 self.conn.commit()
                 if progress is not None:
                     progress.file_done("error")
-                if isinstance(exc, LLMError) and "injoignable" in str(exc):
+                if isinstance(exc, LLMUnreachable):
                     raise  # inutile de continuer sans modèle
+                refused_in_a_row = refused_in_a_row + 1 if isinstance(exc, LLMRefused) else 0
+                if refused_in_a_row >= 3:
+                    raise  # le modèle refuse tout : on s'arrête et on affiche sa raison
                 continue
+            refused_in_a_row = 0
             if progress is not None:
                 progress.file_done(outcome)
             if outcome == "indexed":
