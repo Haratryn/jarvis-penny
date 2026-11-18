@@ -74,9 +74,18 @@ CREATE TABLE IF NOT EXISTS timings (
 """
 
 
-def connect(path: Path) -> sqlite3.Connection:
+BUSY_TIMEOUT_S = 60
+
+
+def connect(path: Path, readonly: bool = False) -> sqlite3.Connection:
+    """readonly=True pour les consultations (status, docs, ask, diag) : elles ne prennent
+    jamais de verrou d'écriture et fonctionnent pendant un scan (mode WAL)."""
+    if readonly and path.exists():
+        conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=BUSY_TIMEOUT_S)
+        conn.row_factory = sqlite3.Row
+        return conn
     path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(path)
+    conn = sqlite3.connect(path, timeout=BUSY_TIMEOUT_S)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")

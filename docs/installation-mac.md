@@ -411,6 +411,7 @@ Bilan à noter : score sur 10, temps moyen par document et par question, limites
 | `penny scan` : « ne peut pas lire ce dossier » | Nom différent, chemin pris depuis la mauvaise racine, ou niveau intermédiaire sans droit `search` | `penny onedrive check "<dossier>"` indique le niveau en cause |
 | Refus « Penny doit tourner sous le compte penny » alors qu'on est sous `su - penny` | Le garde-fou lisait `USER`/`LOGNAME` (corrigé le 18/11 : compte réel du processus) | Redéployer |
 | `penny: error: unrecognized arguments` sur une commande documentée | Ancienne version encore déployée | Comparer `penny --version` et `git log --oneline -1`, puis `git pull` et redéployer |
+| `sqlite3.OperationalError: database is locked` sur `penny status` pendant un scan | Les consultations écrivaient dans la base (corrigé le 18/11) | Redéployer ; les consultations sont désormais en lecture seule |
 | Un bloc de commandes collé derrière `sudo` n'affiche rien | La saisie du mot de passe avale les lignes suivantes | Une commande à la fois |
 
 ## Constats de sécurité (testés)

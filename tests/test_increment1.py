@@ -173,3 +173,39 @@ def test_avancement_avec_limite(env):
     out = io.StringIO()
     env.scanner.scan(ROOT, limit=3, progress=Progress(stream=out, every=1))
     assert "À analyser ce passage : 3 fichiers (sur 9 en attente)" in out.getvalue()
+
+
+def test_consultation_pendant_un_scan(env, tmp_path):
+    """Un scan qui écrit ne bloque pas status / docs / ask (constaté sur le Mac le 18/11)."""
+    from penny import db as pdb
+    env.scanner.scan(ROOT, limit=3)
+    path = env.tmp / "data" / "penny.sqlite"
+    env.conn.execute("BEGIN IMMEDIATE")          # le scan tient le verrou d'écriture
+    env.conn.execute("UPDATE items SET size = size WHERE id = 'ID!101'")
+    reader = pdb.connect(path, readonly=True)
+    try:
+        assert "9 fichiers listés" in status_text(reader, ROOT)
+        assert cards_listing(reader, ROOT, None, False)
+        Searcher(reader, env.llm).retrieve("Mégane")
+    finally:
+        reader.close()
+        env.conn.rollback()
+
+
+def test_aucun_verrou_pendant_les_appels_au_modele(env):
+    from penny import db as pdb
+    path = env.tmp / "data" / "penny.sqlite"
+    seen = []
+    original = env.llm.embed
+
+    def embed_and_check(texts):
+        other = pdb.connect(path)               # un autre écrivain doit pouvoir écrire maintenant
+        other.execute("PRAGMA busy_timeout = 0")
+        other.execute("INSERT INTO timings(step, seconds, at) VALUES ('test', 0, 'x')")
+        other.commit()
+        other.close()
+        seen.append(True)
+        return original(texts)
+    env.llm.embed = embed_and_check
+    env.scanner.scan(ROOT, limit=2)
+    assert seen

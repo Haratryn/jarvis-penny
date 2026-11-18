@@ -231,6 +231,7 @@ class Scanner:
     def _make_card(self, row: sqlite3.Row, text: str) -> None:
         user = (f"Nom du fichier : {row['name']}\nDossier : {PurePosixPath(row['path']).parent}\n\n"
                 f"--- Début du document ---\n{text[:CARD_INPUT_CHARS]}\n--- Fin ---")
+        self.conn.commit()  # aucun verrou d'écriture pendant l'appel au modèle
         card = self.llm.chat_json(CARD_SYSTEM, user, CARD_SCHEMA)
         date = card.get("doc_date")
         if date and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(date)):
@@ -243,13 +244,14 @@ class Scanner:
              str(card.get("summary", ""))[:800], self.llm.model))
 
     def _index(self, row: sqlite3.Row, text: str) -> None:
-        self.conn.execute("DELETE FROM chunks_fts WHERE rowid IN (SELECT id FROM chunks WHERE item_id = ?)",
-                          (row["id"],))
-        self.conn.execute("DELETE FROM chunks WHERE item_id = ?", (row["id"],))
         card = self.conn.execute("SELECT title FROM cards WHERE item_id = ?", (row["id"],)).fetchone()
         header = f"Document : {row['path']}" + (f" — {card['title']}" if card and card["title"] else "")
         pieces = chunk_text(text)
+        self.conn.commit()  # aucun verrou d'écriture pendant l'appel au modèle
         vectors = self.llm.embed([f"{header}\n\n{p}" for p in pieces]) if pieces else np.zeros((0, 1))
+        self.conn.execute("DELETE FROM chunks_fts WHERE rowid IN (SELECT id FROM chunks WHERE item_id = ?)",
+                          (row["id"],))
+        self.conn.execute("DELETE FROM chunks WHERE item_id = ?", (row["id"],))
         for ord_, (piece, vec) in enumerate(zip(pieces, vectors)):
             cur = self.conn.execute(
                 "INSERT INTO chunks(item_id, hash, ord, text, embedding, model) VALUES (?,?,?,?,?,?)",

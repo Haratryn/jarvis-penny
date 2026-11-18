@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import os
 import pwd
+import sqlite3
 import subprocess
 import sys
 
@@ -116,11 +117,11 @@ def cmd_scan(cfg: Config, args) -> None:
 
 
 def cmd_status(cfg: Config, args) -> None:
-    print(status_text(db.connect(cfg.db_path), args.root))
+    print(status_text(db.connect(cfg.db_path, readonly=True), args.root))
 
 
 def cmd_docs(cfg: Config, args) -> None:
-    rows = cards_listing(db.connect(cfg.db_path), args.root, args.type, args.sans_texte)
+    rows = cards_listing(db.connect(cfg.db_path, readonly=True), args.root, args.type, args.sans_texte)
     for r in rows:
         if r["doc_type"]:
             who = ", ".join(r["parties"][:3])
@@ -133,7 +134,7 @@ def cmd_docs(cfg: Config, args) -> None:
 
 
 def cmd_ask(cfg: Config, args) -> None:
-    ans = Searcher(db.connect(cfg.db_path), _llm(cfg)).ask(args.question, args.root)
+    ans = Searcher(db.connect(cfg.db_path, readonly=True), _llm(cfg)).ask(args.question, args.root)
     print(ans.text)
     if ans.sources:
         print("\nSources :")
@@ -143,7 +144,7 @@ def cmd_ask(cfg: Config, args) -> None:
 
 
 def cmd_diag(cfg: Config, args) -> None:
-    print(diag_text(db.connect(cfg.db_path), cfg.llm_model, cfg.embed_model))
+    print(diag_text(db.connect(cfg.db_path, readonly=True), cfg.llm_model, cfg.embed_model))
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -183,6 +184,10 @@ def main(argv: list[str] | None = None) -> None:
         args.func(cfg, args)
     except (OneDriveError, LLMError) as exc:
         sys.exit(f"Erreur : {exc}")
+    except sqlite3.OperationalError as exc:
+        if "locked" in str(exc):
+            sys.exit("Erreur : la base de Penny est occupée par une autre commande. Réessayer dans un instant.")
+        raise
     except KeyboardInterrupt:
         sys.exit("\nInterrompu. Relancer la même commande reprend où elle s'était arrêtée.")
 
