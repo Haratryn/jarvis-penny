@@ -14,6 +14,7 @@ from .llm import LLMError, Ollama
 from .localfolder import LocalFolderSource
 from .onedrive import OneDriveError, RcloneOneDrive
 from .pipeline import Scanner
+from .progress import Progress
 from .report import diag_text, status_text
 from .search import Searcher, cards_listing
 
@@ -101,11 +102,12 @@ def cmd_scan(cfg: Config, args) -> None:
     conn = db.connect(cfg.db_path)
     scanner = Scanner(conn, _source(cfg, conn), LocalExtractor(), _llm(cfg), cfg.cache_dir, cfg.markdown_dir,
                       cfg.max_file_mb)
-    def progress(n: int, total: int) -> None:
-        print(f"\r  traitement {n}/{total}…", end="", file=sys.stderr, flush=True)
+    progress = Progress()
     print(f"Inventaire de « {args.root} »…")
-    rep = scanner.scan(args.root, limit=args.limit, progress=progress)
-    print(file=sys.stderr)
+    try:
+        rep = scanner.scan(args.root, limit=args.limit, progress=progress)
+    finally:
+        progress.finish()
     print(f"Inventaire : {rep.listed} fichiers ({rep.new} nouveaux, {rep.changed} modifiés, "
           f"{rep.moved} déplacés ou renommés, {rep.gone} disparus)")
     print(f"Ce passage : {rep.processed} analysés, {rep.no_text} sans texte, {rep.skipped} ignorés, "

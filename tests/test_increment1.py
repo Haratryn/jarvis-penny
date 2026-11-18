@@ -150,3 +150,26 @@ def test_images_et_formats_non_pris_en_charge_ne_sont_pas_telecharges(env):
     assert "ID!109" in env.source.downloads       # texte (vide, mais lisible)
     reasons = dict(env.conn.execute("SELECT item_id, reason FROM processing").fetchall())
     assert reasons["ID!107"] == "image" and reasons["ID!108"] == "format_non_pris_en_charge"
+
+
+def test_avancement_sans_nom_de_fichier(env):
+    import io
+    from penny.progress import Progress
+    out = io.StringIO()
+    progress = Progress(stream=out, every=1)
+    env.scanner.scan(ROOT, progress=progress)
+    progress.finish()
+    text = out.getvalue()
+    assert "À analyser ce passage : 9 fichiers" in text
+    assert "[9/9]" in text and "analysés 6, sans texte 2, ignorés 1, erreurs 0" in text
+    assert "moyenne" in text and "reste" in text and "Durée du passage" in text
+    for _, (path, _) in env.source.files.items():
+        assert path.split("/")[-1] not in text, "aucun nom de fichier dans l'avancement"
+
+
+def test_avancement_avec_limite(env):
+    import io
+    from penny.progress import Progress
+    out = io.StringIO()
+    env.scanner.scan(ROOT, limit=3, progress=Progress(stream=out, every=1))
+    assert "À analyser ce passage : 3 fichiers (sur 9 en attente)" in out.getvalue()

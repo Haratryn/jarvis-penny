@@ -358,6 +358,10 @@ penny% penny status
 - L'inventaire complet s'affiche tout de suite ; 50 fichiers au plus sont analysés à chaque passage.
   Relancer la même commande pour continuer (ou sans `--limit` pour tout faire).
 - `Ctrl-C` à tout moment : la commande suivante reprend où elle s'était arrêtée.
+- Pendant le scan, une ligne d'avancement se met à jour, sans aucun nom de fichier (copiable telle
+  quelle) : `[12/50] — .pdf : fiche (modèle local) — écoulé 4 min 10 s — moyenne 21 s/doc — reste
+  ~13 min — analysés 9, sans texte 2, ignorés 1, erreurs 0`.
+- Depuis un autre terminal, pendant le scan : `su - penny -c 'penny status'`.
 - Le premier PDF déclenche le téléchargement des modèles de Docling (une fois).
 - Avec la source locale, aucun fichier n'est copié : Penny lit sur place et ne garde que le
   texte extrait (Markdown) et sa mémoire, sous `/Users/penny/penny-data`.

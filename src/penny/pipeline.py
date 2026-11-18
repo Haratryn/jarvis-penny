@@ -97,6 +97,11 @@ class Scanner:
                  cache_dir: Path, markdown_dir: Path, max_file_mb: int = 50):
         self.conn, self.source, self.extractor, self.llm = conn, source, extractor, llm
         self.cache_dir, self.markdown_dir, self.max_bytes = cache_dir, markdown_dir, max_file_mb * 1024 * 1024
+        self.progress = None
+
+    def _step(self, name: str) -> None:
+        if self.progress is not None:
+            self.progress.step_start(name)
 
     # --- Inventaire ---------------------------------------------------------------
     def inventory(self, root: str, report: ScanReport) -> None:
@@ -179,6 +184,7 @@ class Scanner:
 
         local = Path(proc["local_path"]) if proc["local_path"] else None
         if state == "listed" or local is None or not local.exists():
+            self._step("read")
             t = time.monotonic()
             local = self.cache_dir / safe_id(item_id) / f"{safe_id(hash_)[-24:]}{row['ext']}"
             remote = RemoteFile(item_id, row["path"], row["name"], row["size"], row["mtime"] or "", hash_)
@@ -189,6 +195,7 @@ class Scanner:
 
         md_path = self.markdown_dir / f"{safe_id(item_id)}.md"
         if state == "downloaded" or not md_path.exists():
+            self._step("extract")
             t = time.monotonic()
             try:
                 text = self.extractor.to_markdown(local)
@@ -206,6 +213,7 @@ class Scanner:
 
         text = md_path.read_text(encoding="utf-8")
         if state == "extracted":
+            self._step("card")
             t = time.monotonic()
             self._make_card(row, text)
             self._timed("card", t)
@@ -213,6 +221,7 @@ class Scanner:
             state = "carded"
 
         if state == "carded":
+            self._step("index")
             t = time.monotonic()
             self._index(row, text)
             self._timed("index", t)
@@ -254,11 +263,14 @@ class Scanner:
         report = ScanReport()
         self.inventory(root, report)
         todo = self.pending(root)
+        self.progress = progress
+        if progress is not None:
+            progress.planned(len(todo), limit)
         for n, row in enumerate(todo):
             if limit is not None and report.processed + report.no_text + report.skipped + report.errors >= limit:
                 break
-            if progress:
-                progress(n + 1, len(todo))
+            if progress is not None:
+                progress.file_start(n + 1, row["ext"])
             try:
                 outcome = self.process(root, row)
             except Exception as exc:  # un fichier en échec ne doit jamais arrêter l'analyse des autres
@@ -269,9 +281,13 @@ class Scanner:
                     "UPDATE processing SET state='error', reason=?, attempts=attempts+1, updated_at=? WHERE item_id=?",
                     (code, now(), row["id"]))
                 self.conn.commit()
+                if progress is not None:
+                    progress.file_done("error")
                 if isinstance(exc, LLMError) and "injoignable" in str(exc):
                     raise  # inutile de continuer sans modèle
                 continue
+            if progress is not None:
+                progress.file_done(outcome)
             if outcome == "indexed":
                 report.processed += 1
             elif outcome == "no_text":
