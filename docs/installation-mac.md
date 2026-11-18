@@ -267,6 +267,9 @@ $ sudo ./scripts/mac/deploy-penny.sh
 Attendu : `Penny <commit> installée dans /opt/penny/releases/…`, la configuration de `penny`
 créée, puis `bge-m3 : prêt` et `qwen3:8b : prêt`. Le premier déploiement télécharge Python,
 les dépendances et les modèles : compter plusieurs minutes.
+Les déploiements suivants réutilisent l'environnement des dépendances tant que `uv.lock` ne
+change pas (`dépendances inchangées : environnement … réutilisé`) : quelques secondes. Les
+3 dernières versions sont conservées, les plus anciennes supprimées.
 
 Vérification :
 ```

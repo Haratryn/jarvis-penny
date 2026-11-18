@@ -64,24 +64,65 @@ info "uv : $("$UV" --version)"
 [[ -x "$RCLONE" ]] && info "rclone : $("$RCLONE" version | head -1)"
 
 echo "Déploiement de la version $COMMIT :"
+# Les dépendances (Docling, modèles…) vivent dans un environnement partagé, identifié par
+# l'empreinte de uv.lock et pyproject.toml : il n'est reconstruit que si elles changent.
+# Chaque version ne contient que le code de Penny (quelques centaines de Ko).
 REL="$BASE/releases/$COMMIT"
-mkdir -p "$BASE/releases"
-if [[ ! -x "$REL/.venv/bin/penny" ]]; then
+DEPS_ID="$(cat uv.lock pyproject.toml | shasum -a 256 | cut -c1-16)"
+VENV="$BASE/venvs/$DEPS_ID"
+mkdir -p "$BASE/releases" "$BASE/venvs"
+
+if [[ ! -x "$VENV/bin/python" ]]; then
+  info "dépendances modifiées : installation de l'environnement $DEPS_ID (long la première fois)"
+  rm -rf "$VENV"
+  BUILD="$(mktemp -d)"
+  as_dev git archive --format=tar HEAD uv.lock pyproject.toml | tar -x -C "$BUILD"
+  UV_PYTHON_INSTALL_DIR="$BASE/python" UV_CACHE_DIR="$BASE/uv-cache" UV_PROJECT_ENVIRONMENT="$VENV" \
+    "$UV" sync --frozen --no-dev --extra extract --no-install-project --project "$BUILD" --python 3.13 --managed-python
+  rm -rf "$BUILD"
+  chown -R root:wheel "$VENV" "$BASE/python" "$BASE/uv-cache"
+  chmod -R go-w "$VENV" "$BASE/python" "$BASE/uv-cache"
+else
+  info "dépendances inchangées : environnement $DEPS_ID réutilisé"
+fi
+
+if [[ ! -d "$REL/src/penny" ]]; then
   rm -rf "$REL"
   mkdir -p "$REL"
   as_dev git archive --format=tar HEAD | tar -x -C "$REL"
-  UV_PYTHON_INSTALL_DIR="$BASE/python" UV_CACHE_DIR="$BASE/uv-cache" UV_PROJECT_ENVIRONMENT="$REL/.venv" \
-    "$UV" sync --frozen --no-dev --extra extract --project "$REL" --python 3.13 --managed-python
+  chown -R root:wheel "$REL"
+  chmod -R go-w "$REL"
 fi
-chown -R root:wheel "$BASE"
-chmod -R go-w "$BASE"
+[[ -d "$REL/.venv" && ! -L "$REL/.venv" ]] && rm -rf "${REL:?}/.venv"  # version de l'ancien format
+ln -sfn "$VENV" "$REL/.venv"
+chown -h root:wheel "$REL/.venv"
+chown root:wheel "$BASE" "$BASE/releases" "$BASE/venvs"
+chmod go-w "$BASE" "$BASE/releases" "$BASE/venvs"
 ln -sfn "$REL" "$BASE/current"
-cat > /usr/local/bin/penny <<EOF
-#!/bin/sh
-exec $BASE/current/.venv/bin/penny "\$@"
-EOF
+printf '%s\n' '#!/bin/sh' \
+  '# Penny : code de la version courante + environnement de dépendances partagé (tout en root:wheel)' \
+  "PYTHONPATH=\"$BASE/current/src\" exec \"$BASE/current/.venv/bin/python\" -m penny.cli \"\$@\"" \
+  > /usr/local/bin/penny
 chown root:wheel /usr/local/bin/penny
 chmod 755 /usr/local/bin/penny
+
+# Ménage : on garde les 3 dernières versions et les environnements qu'elles utilisent.
+current_rel="$(readlink "$BASE/current")"
+# shellcheck disable=SC2012  # noms de versions = commits, sans caractères spéciaux
+while IFS= read -r old; do
+  [[ -n "$old" && "$BASE/releases/$old" != "$current_rel" ]] && rm -rf "${BASE:?}/releases/${old:?}"
+done < <(ls -1t "$BASE/releases" | tail -n +4)
+for env in "$BASE/venvs"/*; do
+  [[ -d "$env" ]] || continue
+  used=0
+  for rel in "$BASE/releases"/*; do
+    [[ "$(readlink "$rel/.venv" 2>/dev/null)" == "$env" ]] && used=1
+  done
+  if [[ $used -eq 0 ]]; then
+    rm -rf "${env:?}"
+    info "ancien environnement supprimé : $(basename "$env")"
+  fi
+done
 info "Penny $COMMIT installée dans $REL (root:wheel, non modifiable par $SERVICE_USER)"
 
 echo "Configuration de $SERVICE_USER :"
