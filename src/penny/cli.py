@@ -231,6 +231,36 @@ def cmd_dossiers(cfg: Config, args) -> None:
     print(status_text(conn, args.root))
 
 
+def cmd_doublons(cfg: Config, args) -> None:
+    """Rapport en lecture seule : rien n'est déplacé ni supprimé."""
+    from .decisions import human_size
+    from .duplicates import all_groups, summary
+    conn = db.connect(cfg.db_path, readonly=True)
+    groups = all_groups(conn, args.root, args.seuil)
+    if args.type:
+        groups = [g for g in groups if g.kind == args.type]
+    titles = {"identiques": "COPIES IDENTIQUES (certain)",
+              "probables": "MÊME DOCUMENT, FORMES DIFFÉRENTES (probable)",
+              "indices": "MÊME NOM ET MÊME TAILLE (indice, contenu non lu)"}
+    for kind in ("identiques", "probables", "indices"):
+        part = [g for g in groups if g.kind == kind]
+        if not part:
+            continue
+        print(f"\n== {titles[kind]} : {len(part)} groupes ==")
+        for n, g in enumerate(sorted(part, key=lambda g: -g.wasted), 1):
+            print(f"\n  Groupe {n} — {g.proof} — {human_size(g.wasted)} en trop")
+            for m in sorted(g.members, key=lambda m: m["mtime"]):
+                print(f"    {m['mtime'][:10]}  {human_size(m['size']):>9}  {m['root'].strip('/')}/{m['path']}")
+    print("\nRésumé (sans nom, transmissible) :")
+    stats = summary(groups)
+    if not stats:
+        print("  aucun doublon repéré dans le périmètre.")
+    for kind, (n, files, wasted) in stats.items():
+        print(f"  {kind:<10} {n:>5} groupes, {files:>6} fichiers, {human_size(wasted)} en trop")
+    print("Rien n'a été modifié. Les doublons probables et les indices sont des hypothèses à vérifier.")
+    print("Périmètre : fichiers des dossiers non ignorés ; « probables » : documents analysés seulement.")
+
+
 def cmd_status(cfg: Config, args) -> None:
     print(status_text(db.connect(cfg.db_path, readonly=True), args.root))
 
@@ -327,6 +357,12 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--fichiers-seulement", action="store_true",
                    help="avec --decider : seulement les fichiers posés directement dans ce dossier")
     p.set_defaults(func=cmd_dossiers)
+    p = sub.add_parser("doublons", help="rapport des doublons (lecture seule, rien n'est modifié)")
+    p.add_argument("root", nargs="?", help="limiter à un dossier analysé")
+    p.add_argument("--type", choices=["identiques", "probables", "indices"], help="un seul type")
+    p.add_argument("--seuil", type=float, default=0.95,
+                   help="similarité minimale pour « probables » (0 à 1, défaut 0,95)")
+    p.set_defaults(func=cmd_doublons)
     p = sub.add_parser("status", help="état de l'analyse")
     p.add_argument("root", nargs="?")
     p.set_defaults(func=cmd_status)

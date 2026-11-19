@@ -19,6 +19,7 @@ penny scan "<dossier>" [--limit N] # inventaire puis analyse (reprise automatiqu
 penny status [<dossier>]           # listés, analysés, sans texte, ignorés, erreurs
 penny docs [--type T] [--sans-texte]
 penny ask "question" [--root <dossier>]
+penny doublons ["<dossier>"] [--type T] [--seuil 0.95]   # rapport en lecture seule
 penny diag                         # rapport anonymisé : le seul à transmettre à Claude
 ```
 

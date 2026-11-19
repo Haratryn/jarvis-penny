@@ -108,4 +108,9 @@ def diag_text(conn: sqlite3.Connection, llm_model: str, embed_model: str) -> str
     for r in conn.execute("SELECT step, COUNT(*) AS n, AVG(seconds) AS avg, MAX(seconds) AS mx FROM timings GROUP BY step"):
         out.append(f"    {r['step']:<9} n={r['n']:<6} moyenne={r['avg']:.1f} max={r['mx']:.1f}")
     out.append(f"Passages indexés : {conn.execute('SELECT COUNT(*) FROM chunks').fetchone()[0]}")
+    from .decisions import human_size
+    from .duplicates import all_groups, summary
+    stats = summary(all_groups(conn))
+    out.append("Doublons : " + (", ".join(f"{k} {n} groupes / {f} fichiers / {human_size(w)} en trop"
+                                          for k, (n, f, w) in stats.items()) or "aucun"))
     return "\n".join(out)

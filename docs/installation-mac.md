@@ -455,6 +455,26 @@ penny% penny diag                       # rapport anonymisé, le seul à transme
 Chaque réponse cite ses sources (`[1]`, `[2]`… avec le chemin OneDrive) et rappelle le périmètre :
 « N documents analysés sur M ». Une citation qui ne correspond à aucun extrait retrouvé est retirée.
 
+### 11.5 bis Doublons (lecture seule)
+
+```
+$ penny-lancer doublons
+$ penny-lancer doublons "<dossier>" --type identiques
+$ penny-lancer doublons --seuil 0.97
+```
+Rapport en **lecture seule** : rien n'est déplacé ni supprimé. Trois niveaux de preuve :
+
+| Niveau | Preuve | Portée |
+|---|---|---|
+| Copies identiques | même empreinte de contenu (SHA-256) : certain | documents analysés |
+| Même document, formes différentes | textes très proches (similarité ≥ `--seuil`, 0,95 par défaut) : probable | documents analysés |
+| Même nom et même taille | contenu non lu : indice à vérifier | photos, inventaire seul… |
+
+Pour chaque groupe : la preuve, la place occupée en trop, et les fichiers (date, taille, chemin).
+Le résumé final (sans aucun nom) est transmissible ; il figure aussi dans `penny diag`.
+Le seuil de similarité est à ajuster sur vos données : trop bas, des documents seulement voisins
+sont regroupés ; trop haut, des versions différentes du même document échappent.
+
 ### 11.6 Critère de réussite de l'incrément 1
 
 | Test | Attendu |
