@@ -95,10 +95,10 @@ def test_dossier_illisible_message_clair(local):
 
 def test_fichier_a_la_demande_illisible_n_arrete_pas_le_scan(local, monkeypatch):
     original = LocalExtractor.to_markdown
-    def flaky(self, path):
+    def flaky(self, path, ocr=False):
         if path.name == "attestation-habitation-2026.md":
             raise OSError(35, "Resource deadlock avoided")  # erreur typique d'un fichier non téléchargé
-        return original(self, path)
+        return original(self, path, ocr)
     monkeypatch.setattr(LocalExtractor, "to_markdown", flaky)
     rep = local.scanner.scan(ROOT)
     assert rep.errors == 1 and rep.processed == 5

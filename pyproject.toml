@@ -12,6 +12,8 @@ dependencies = [
 # inutile pour les tests (qui utilisent un extracteur de remplacement).
 extract = [
     "docling>=2.40,<3",
+    # OCR par Apple Vision (macOS uniquement) ; sur Linux, un autre moteur sera choisi.
+    "docling[ocrmac]>=2.40,<3 ; sys_platform == 'darwin'",
 ]
 
 [project.scripts]

@@ -455,6 +455,30 @@ penny% penny diag                       # rapport anonymisé, le seul à transme
 Chaque réponse cite ses sources (`[1]`, `[2]`… avec le chemin OneDrive) et rappelle le périmètre :
 « N documents analysés sur M ». Une citation qui ne correspond à aucun extrait retrouvé est retirée.
 
+### 11.4 bis Lire les scans et les photos (OCR)
+
+**Outil** : Apple Vision, l'OCR intégré à macOS, **local** (puce du Mac), via Docling (`ocrmac`).
+Langues : français et anglais. Les photos HEIC de l'iPhone sont d'abord converties par `sips`
+(intégré à macOS). Documenté : Docling prend en charge `ocrmac` (`OcrMacOptions`, langues au format
+macOS). Testé hors Mac : la logique de Penny (faux moteur OCR). À mesurer : vitesse et qualité réelles.
+
+Le déploiement qui suit cette version réinstalle les dépendances une fois (ajout d'`ocrmac`).
+
+Test, avec une image au texte inventé (sortie transmissible) :
+```
+$ penny-lancer ocr check
+```
+Attendu : `ok OCR Apple Vision`, puis les quatre lignes du texte inventé reconnues.
+
+Utilisation : le premier passage reste sans OCR (rapide) ; ensuite
+```
+$ penny-lancer scan "<dossier>" --ocr --limit 20 --details
+```
+reprend **seulement** les PDF sans texte et les images des dossiers *à analyser*. Une image où l'OCR
+trouve trop peu de texte est une photo : classée « photo (OCR : pas de texte) », jamais reprise.
+Pour éviter d'OCRiser des milliers de photos de vacances : les mettre en *Inventaire seul* avec
+`penny-lancer dossiers "<dossier>" --revoir`.
+
 ### 11.5 bis Doublons (lecture seule)
 
 ```

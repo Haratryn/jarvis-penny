@@ -134,7 +134,7 @@ def test_decoupage():
 
 def test_erreur_inattendue_d_extraction_n_arrete_pas_le_scan(env):
     class Boom:
-        def to_markdown(self, path):
+        def to_markdown(self, path, ocr=False):
             if path.suffix == ".txt":
                 raise ConnectionError("modèles Docling non téléchargeables")
             from penny.extract import LocalExtractor

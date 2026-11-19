@@ -104,6 +104,9 @@ def cmd_scan(cfg: Config, args) -> None:
     scanner = Scanner(conn, _source(cfg, conn), LocalExtractor(), _llm(cfg), cfg.cache_dir, cfg.markdown_dir,
                       cfg.max_file_mb)
     progress = Progress(details=args.details)
+    scanner.ocr = args.ocr
+    if args.ocr:
+        print("OCR activé : les PDF scannés et les images des dossiers à analyser sont lus par Apple Vision.")
     print(f"Inventaire de « {args.root} »…")
     try:
         rep = scanner.scan(args.root, limit=args.limit, progress=progress, accept_gone=args.confirmer_disparitions)
@@ -325,6 +328,38 @@ def cmd_models_check(cfg: Config, args) -> None:
     print("Modèles OK." if not failed else "Modèles en échec : voir les lignes ci-dessus.")
 
 
+def cmd_ocr_check(cfg: Config, args) -> None:
+    """Teste l'OCR (Apple Vision) sur une image fabriquée avec un texte INVENTÉ : sortie transmissible."""
+    import tempfile
+    import time
+    from pathlib import Path
+    from PIL import Image, ImageDraw, ImageFont
+    text = ["FACTURE N° 2026-042", "Date : 15/03/2026", "Société Exemple — Jean Fictif", "Total : 120,00 EUR TTC"]
+    img = Image.new("RGB", (1400, 500), "white")
+    draw = ImageDraw.Draw(img)
+    try:
+        font = ImageFont.load_default(size=56)
+    except TypeError:
+        font = ImageFont.load_default()
+    for n, line in enumerate(text):
+        draw.text((60, 50 + n * 105), line, fill="black", font=font)
+    with tempfile.TemporaryDirectory(prefix="penny-ocr-check-") as tmp:
+        path = Path(tmp) / "exemple.png"
+        img.save(path)
+        t = time.monotonic()
+        try:
+            found = LocalExtractor()._ocr_text(path)
+        except Exception as exc:  # message technique, sans donnée
+            print(f"  ÉCHEC  OCR : {exc.__class__.__name__} : {exc}")
+            return
+        print(f"  ok     OCR Apple Vision : {time.monotonic() - t:.1f} s (premier appel : chargement compris)")
+    print("  Texte reconnu :")
+    for line in found.splitlines():
+        if line.strip():
+            print(f"    {line.strip()}")
+    print("  Attendu : " + " / ".join(text))
+
+
 def cmd_diag(cfg: Config, args) -> None:
     print(diag_text(db.connect(cfg.db_path, readonly=True), cfg.llm_model, cfg.embed_model))
 
@@ -342,6 +377,8 @@ def main(argv: list[str] | None = None) -> None:
     p = sub.add_parser("scan", help="inventorier et analyser un dossier OneDrive")
     p.add_argument("root", help="dossier OneDrive, ex. « Documents/Administratif »")
     p.add_argument("--limit", type=int, default=None, help="nombre maximal de fichiers à analyser ce passage")
+    p.add_argument("--ocr", action="store_true",
+                   help="lire aussi les PDF scannés et les images (Apple Vision, local) ; plus lent")
     p.add_argument("--details", action="store_true",
                    help="afficher chaque document traité (chemin, résultat, durée) — pour votre écran seulement")
     p.add_argument("--confirmer-disparitions", action="store_true",
@@ -381,6 +418,9 @@ def main(argv: list[str] | None = None) -> None:
     mo = sub.add_parser("models", help="modèles locaux (Ollama)")
     mo_sub = mo.add_subparsers(dest="action", required=True)
     mo_sub.add_parser("check", help="tester les modèles avec un texte inventé").set_defaults(func=cmd_models_check)
+    oc = sub.add_parser("ocr", help="OCR des scans et images (Apple Vision, local)")
+    oc_sub = oc.add_subparsers(dest="action", required=True)
+    oc_sub.add_parser("check", help="tester l'OCR sur une image au texte inventé").set_defaults(func=cmd_ocr_check)
     sub.add_parser("diag", help="rapport ANONYMISÉ (le seul à transmettre à Claude)").set_defaults(func=cmd_diag)
 
     args = parser.parse_args(argv)

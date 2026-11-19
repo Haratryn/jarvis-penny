@@ -18,7 +18,7 @@ import numpy as np
 
 from . import db
 from .decisions import IGNORE, Decisions, apply_scope
-from .extract import DOCLING_EXT, IMAGE_EXT, TEXT_EXT, Extractor, NoText, Unsupported
+from .extract import DOCLING_EXT, IMAGE_EXT, TEXT_EXT, Extractor, NoText, Unsupported  # noqa: F401
 from .llm import LLM, LLMRefused, LLMUnreachable
 from .onedrive import RemoteFile, Source
 
@@ -105,6 +105,7 @@ class Scanner:
         self.conn, self.source, self.extractor, self.llm = conn, source, extractor, llm
         self.cache_dir, self.markdown_dir, self.max_bytes = cache_dir, markdown_dir, max_file_mb * 1024 * 1024
         self.progress = None
+        self.ocr = False
 
     def _step(self, name: str) -> None:
         if self.progress is not None:
@@ -177,8 +178,9 @@ class Scanner:
                WHERE i.root = ? AND i.gone = 0 AND i.scope = 'analyser'
                  AND (p.item_id IS NULL OR p.hash != i.hash
                       OR (p.state NOT IN ('indexed','no_text','skipped')
-                          AND NOT (p.state = 'error' AND p.attempts >= ?)))
-               ORDER BY i.path""", (root, MAX_ATTEMPTS)).fetchall()
+                          AND NOT (p.state = 'error' AND p.attempts >= ?))
+                      OR (? AND p.state = 'no_text' AND p.reason IN ('image', 'sans_texte')))
+               ORDER BY i.path""", (root, MAX_ATTEMPTS, int(self.ocr))).fetchall()
 
     def _set_state(self, item_id: str, hash_: str, state: str, reason: str | None = None, **paths) -> None:
         cols = {"local_path": paths.get("local_path"), "md_path": paths.get("md_path")}
@@ -198,9 +200,9 @@ class Scanner:
 
     def quick_decision(self, row: sqlite3.Row) -> tuple[str, str] | None:
         """État final décidable sans ouvrir le fichier, ou None s'il faut l'analyser."""
-        if row["ext"] in IMAGE_EXT:
+        if row["ext"] in IMAGE_EXT and not self.ocr:
             return "no_text", "image"
-        if row["ext"] not in TEXT_EXT | DOCLING_EXT:
+        if row["ext"] not in TEXT_EXT | DOCLING_EXT | IMAGE_EXT:
             return "skipped", "format_non_pris_en_charge"
         if row["size"] > self.max_bytes:
             return "skipped", "trop_volumineux"
@@ -215,19 +217,15 @@ class Scanner:
             self.conn.execute("UPDATE processing SET attempts = 0, local_path = NULL, md_path = NULL"
                               " WHERE item_id = ?", (item_id,))
             proc = self.conn.execute("SELECT * FROM processing WHERE item_id = ?", (item_id,)).fetchone()
-        state = proc["state"] if proc["state"] != "error" else (
-            "extracted" if proc["md_path"] else "downloaded" if proc["local_path"] else "listed")
+        state = proc["state"] if proc["state"] not in ("error", "no_text") else (
+            "extracted" if proc["md_path"] and proc["state"] == "error"
+            else "downloaded" if proc["local_path"] else "listed")
 
         # Décidé sur l'extension, sans téléchargement : rien n'est copié inutilement.
-        if row["ext"] in IMAGE_EXT:
-            self._set_state(item_id, hash_, "no_text", "image")
-            return "no_text"
-        if row["ext"] not in TEXT_EXT | DOCLING_EXT:
-            self._set_state(item_id, hash_, "skipped", "format_non_pris_en_charge")
-            return "skipped"
-        if row["size"] > self.max_bytes:
-            self._set_state(item_id, hash_, "skipped", "trop_volumineux")
-            return "skipped"
+        quick = self.quick_decision(row)
+        if quick is not None:
+            self._set_state(item_id, hash_, quick[0], quick[1])
+            return quick[0]
 
         local = Path(proc["local_path"]) if proc["local_path"] else None
         if state == "listed" or local is None or not local.exists():
@@ -242,10 +240,11 @@ class Scanner:
 
         md_path = self.markdown_dir / f"{safe_id(item_id)}.md"
         if state == "downloaded" or not md_path.exists():
-            self._step("extract")
+            needs_ocr = self.ocr and (row["ext"] in IMAGE_EXT or proc["reason"] == "sans_texte")
+            self._step("ocr" if needs_ocr else "extract")
             t = time.monotonic()
             try:
-                text = self.extractor.to_markdown(local)
+                text = self.extractor.to_markdown(local, ocr=self.ocr)
             except NoText as exc:
                 self._set_state(item_id, hash_, "no_text", str(exc))
                 return "no_text"

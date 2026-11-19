@@ -13,6 +13,7 @@ import time
 STEP_LABELS = {
     "read": "lecture",
     "extract": "extraction du texte",
+    "ocr": "lecture par OCR (Apple Vision)",
     "card": "fiche (modèle local)",
     "index": "indexation",
 }
