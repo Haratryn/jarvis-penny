@@ -7,7 +7,10 @@ synchronisé du Mac, sans réseau ; rclone en alternative), l'inventorier et
 répondre avec des sources. IA 100 % locale (Ollama). Penny voit les données réelles sous le
 compte `penny` ; Claude Code ne voit que des données inventées (voir `CLAUDE.md`).
 
-## Utilisation (compte `penny`)
+## Utilisation
+
+Depuis votre compte (recommandé) : `penny-lancer <commande> …` (garde OneDrive réveillé).
+Sous le compte `penny` :
 
 ```
 penny onedrive check              # accès au OneDrive local (ou connect|check avec rclone)

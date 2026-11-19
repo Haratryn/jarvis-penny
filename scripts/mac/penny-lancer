@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# Lance une commande Penny depuis le compte du développeur, en gardant OneDrive « réveillé ».
+#
+#   penny-lancer scan "<dossier>" --limit 50 --details
+#   penny-lancer dossiers "<dossier>"
+#   penny-lancer status
+#
+# Pourquoi : OneDrive (File Provider) décharge parfois la liste du contenu des dossiers (veille,
+# synchronisation). Seul le propriétaire du OneDrive peut la faire recharger ; pour le compte
+# penny, macOS répond alors « Operation not permitted » (constaté et vérifié le 19/11/2026).
+#
+# Ce que fait ce script :
+#   1. parcourt, sous VOTRE compte, les dossiers passés en argument : seules les listes de
+#      dossiers sont rechargées, aucun fichier n'est lu ;
+#   2. lance « penny <commande> » sous le compte penny (sudo : votre mot de passe) ;
+#   3. pendant la commande, refait ce parcours toutes les 10 minutes et empêche la veille.
+# Installé par scripts/mac/deploy-penny.sh dans /usr/local/bin (root:wheel).
+set -euo pipefail
+
+SERVICE_USER="penny"
+PENNY_BIN="/usr/local/bin/penny"
+INTERVAL_S=600
+
+die() { echo "ERREUR : $1" >&2; exit 1; }
+
+[[ "$(uname -s)" == "Darwin" ]] || die "réservé au Mac"
+[[ "$(id -un)" != "$SERVICE_USER" ]] || die "à lancer depuis votre compte, pas depuis penny (sous penny : penny $*)"
+[[ "$(id -u)" -ne 0 ]] || die "à lancer sans sudo, depuis votre compte"
+[[ $# -ge 1 ]] || die "usage : penny-lancer <commande penny> [arguments]  (ex. penny-lancer scan \"<dossier>\")"
+
+# Dossiers à garder réveillés : les arguments qui sont des dossiers existants.
+wake_dirs=()
+for arg in "$@"; do
+  [[ -d "$arg" ]] && wake_dirs+=("$arg")
+done
+
+wake() {
+  local d
+  for d in "${wake_dirs[@]+"${wake_dirs[@]}"}"; do
+    # Listes de dossiers seulement (-type d) : aucun contenu de fichier n'est lu.
+    find "$d" -type d > /dev/null 2>&1 || true
+  done
+}
+
+if [[ ${#wake_dirs[@]} -gt 0 ]]; then
+  echo "Réveil de OneDrive (listes de dossiers, sous votre compte)…"
+  wake
+fi
+
+sudo -v || die "sudo refusé"
+
+# Réveil périodique en arrière-plan ; la commande Penny reste au premier plan (questions de
+# « penny dossiers », Ctrl-C).
+keeper=""
+if [[ ${#wake_dirs[@]} -gt 0 ]]; then
+  ( while sleep "$INTERVAL_S"; do wake; done ) &
+  keeper=$!
+fi
+trap '[[ -n "$keeper" ]] && kill "$keeper" 2>/dev/null; true' EXIT
+
+status=0
+caffeinate -i sudo -u "$SERVICE_USER" -H "$PENNY_BIN" "$@" || status=$?
+exit "$status"

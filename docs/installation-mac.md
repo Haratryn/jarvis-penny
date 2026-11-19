@@ -369,6 +369,25 @@ En cas d'`ÉCHEC`, la ligne donne la raison d'Ollama (mémoire insuffisante, mod
 Rappel : l'Ollama de votre compte (port 11434) et celui de `penny` se partagent les 16 Go ;
 quitter l'appli Ollama de votre compte pendant les analyses.
 
+### 11.3 bis-2 Lancer Penny depuis votre compte : `penny-lancer` (recommandé)
+
+**Constaté et vérifié le 19/11/2026** : OneDrive décharge parfois la liste du contenu des dossiers
+(veille, synchronisation). Seul votre compte peut la faire recharger ; pour `penny`, macOS répond
+alors `Operation not permitted` (le diagnostic affiche « BLOQUÉ … TCC »). Parcourir le dossier
+depuis votre compte rétablit l'accès.
+
+`penny-lancer` le fait pour vous, **depuis votre compte** (pas de `su`) :
+```
+$ penny-lancer dossiers "<dossier>"
+$ penny-lancer scan "<dossier>" --limit 50 --details
+$ penny-lancer status
+```
+1. parcourt les dossiers passés en argument sous votre compte (listes seulement, aucun fichier lu) ;
+2. lance la commande sous `penny` (`sudo` : votre mot de passe) ;
+3. pendant la commande, refait ce parcours toutes les 10 minutes et empêche la mise en veille.
+
+Sous `penny` (`su - penny`), les commandes `penny …` restent utilisables quand l'accès est bon.
+
 ### 11.3 ter Décider quels dossiers analyser
 
 **Penny ne lit rien dans un dossier sans votre accord.** Pour chaque dossier : *Analyser* (lu et
@@ -471,6 +490,7 @@ Bilan à noter : score sur 10, temps moyen par document et par question, limites
 | `Ollama injoignable … (HTTPError)` | Ollama répondait par une erreur, mal présentée (corrigé le 18/11) | Redéployer, puis `penny models check` donne la raison |
 | Inventaire « 0 fichiers … 5978 disparus » | Dossier devenu illisible pour penny, pris pour un dossier vide (défaut corrigé le 18/11) | Redéployer : l'inventaire refuse désormais de conclure et indique l'erreur ; les fichiers marqués à tort sont retrouvés avec leurs analyses au prochain inventaire réussi. Vérifier l'accès avec `penny onedrive check "<dossier>"` |
 | `Penny ne peut pas lister ce dossier` avec errno 1 / « Operation not permitted », alors que le diagnostic montre des droits corrects | Protection de la vie privée de macOS (TCC) sur les dossiers OneDrive, attribuée à l'application de terminal | Étape 11.3, point 4 : autoriser l'application de terminal |
+| Accès perdu par intermittence (« BLOQUÉ … TCC », errno 1), qui revient seul | OneDrive décharge la liste des dossiers ; seul votre compte peut la recharger (vérifié le 19/11) | Lancer depuis votre compte avec `penny-lancer …` |
 | Un bloc de commandes collé derrière `sudo` n'affiche rien | La saisie du mot de passe avale les lignes suivantes | Une commande à la fois |
 
 ## Constats de sécurité (testés)

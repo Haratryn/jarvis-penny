@@ -105,6 +105,10 @@ printf '%s\n' '#!/bin/sh' \
   > /usr/local/bin/penny
 chown root:wheel /usr/local/bin/penny
 chmod 755 /usr/local/bin/penny
+# Lanceur depuis le compte du développeur (garde OneDrive réveillé) : copie, pas un lien,
+# pour qu'il reste root:wheel quelle que soit la copie de travail.
+install -o root -g wheel -m 755 "$REL/scripts/mac/penny-lancer" /usr/local/bin/penny-lancer
+info "commandes : /usr/local/bin/penny (sous penny), /usr/local/bin/penny-lancer (depuis votre compte)"
 
 # Ménage : on garde les 3 dernières versions et les environnements qu'elles utilisent.
 current_rel="$(readlink "$BASE/current")"
