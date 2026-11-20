@@ -28,8 +28,10 @@ REASON_LABELS = {
     "docling_absent": "extracteur absent",
     "image": "image",
     "sans_texte": "PDF sans texte",
-    "photo_sans_texte": "photo (OCR : pas de texte)",
-    "ocr_sans_texte": "PDF scanné illisible par l'OCR",
+    "photo_sans_texte": "photo (OCR v1 : pas de texte, sera retentée)",
+    "ocr_sans_texte": "PDF scanné illisible par l'OCR v1 (sera retenté)",
+    "photo_vide": "photo (OCR : pas de texte)",
+    "ocr_vide": "PDF scanné illisible par l'OCR",
     "ocr_indisponible_hors_mac": "OCR indisponible sur cette machine",
     "conversion_heic_impossible": "photo HEIC non convertible",
 }

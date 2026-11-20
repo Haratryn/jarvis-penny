@@ -353,6 +353,13 @@ def cmd_ocr_check(cfg: Config, args) -> None:
             print(f"  ÉCHEC  OCR : {exc.__class__.__name__} : {exc}")
             return
         print(f"  ok     OCR Apple Vision : {time.monotonic() - t:.1f} s (premier appel : chargement compris)")
+        t = time.monotonic()
+        try:
+            raw = LocalExtractor()._vision_raw(path)
+            print(f"  ok     Apple Vision direct (repli) : {time.monotonic() - t:.1f} s, "
+                  f"{len([l for l in raw.splitlines() if l.strip()])} lignes")
+        except Exception as exc:
+            print(f"  ÉCHEC  Apple Vision direct (repli) : {exc.__class__.__name__} : {exc}")
     print("  Texte reconnu :")
     for line in found.splitlines():
         if line.strip():

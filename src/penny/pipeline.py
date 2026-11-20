@@ -179,7 +179,9 @@ class Scanner:
                  AND (p.item_id IS NULL OR p.hash != i.hash
                       OR (p.state NOT IN ('indexed','no_text','skipped')
                           AND NOT (p.state = 'error' AND p.attempts >= ?))
-                      OR (? AND p.state = 'no_text' AND p.reason IN ('image', 'sans_texte')))
+                      OR (? AND p.state = 'no_text' AND p.reason IN (
+                          'image', 'sans_texte',
+                          'photo_sans_texte', 'ocr_sans_texte')))  -- OCR v1 : retentés une fois (page entière)
                ORDER BY i.path""", (root, MAX_ATTEMPTS, int(self.ocr))).fetchall()
 
     def _set_state(self, item_id: str, hash_: str, state: str, reason: str | None = None, **paths) -> None:
@@ -240,7 +242,7 @@ class Scanner:
 
         md_path = self.markdown_dir / f"{safe_id(item_id)}.md"
         if state == "downloaded" or not md_path.exists():
-            needs_ocr = self.ocr and (row["ext"] in IMAGE_EXT or proc["reason"] == "sans_texte")
+            needs_ocr = self.ocr and (row["ext"] in IMAGE_EXT or proc["reason"] in ("sans_texte", "ocr_sans_texte"))
             self._step("ocr" if needs_ocr else "extract")
             t = time.monotonic()
             try:

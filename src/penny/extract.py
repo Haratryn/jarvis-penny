@@ -56,6 +56,26 @@ def quiet_libraries() -> None:
         logging.getLogger(name).setLevel(logging.ERROR)
 
 
+def page_text(lines: list) -> str:
+    """Remet les lignes reconnues dans l'ordre de lecture : de haut en bas, puis de gauche à droite.
+    Coordonnées Apple Vision : origine en bas à gauche, donc haut de ligne = y + h."""
+    rows = []
+    for text, _conf, box in lines:
+        x, y, w, h = box
+        rows.append((round(1 - (y + h), 2), x, str(text).strip()))
+    return "\n".join(t for _, _, t in sorted(rows) if t)
+
+
+def render_pdf_pages(path: Path, scale: float = 3.0, max_pages: int = 30) -> list:
+    """Pages d'un PDF en images (pypdfium2, déjà installé avec Docling)."""
+    import pypdfium2 as pdfium
+    pdf = pdfium.PdfDocument(str(path))
+    try:
+        return [pdf[i].render(scale=scale).to_pil() for i in range(min(len(pdf), max_pages))]
+    finally:
+        pdf.close()
+
+
 class LocalExtractor:
     def __init__(self) -> None:
         self._converter = None
@@ -75,13 +95,21 @@ class LocalExtractor:
                 raise Unsupported("ocr_absent") from exc
             options = PdfPipelineOptions()
             options.do_ocr = True
-            options.ocr_options = OcrMacOptions(lang=OCR_LANGS)
+            # Page entière : sinon le texte situé dans une zone classée « image » (carte d'identité
+            # scannée sur une page, document photographié) est lu puis écarté (constaté le 20/11).
+            try:
+                from docling.datamodel.pipeline_options import OcrMode
+                options.ocr_options = OcrMacOptions(lang=OCR_LANGS, mode=OcrMode.FULL_PAGE)
+            except ImportError:
+                options.ocr_options = OcrMacOptions(lang=OCR_LANGS, force_full_page_ocr=True)
             self._ocr_converter = DocumentConverter(format_options={
                 InputFormat.PDF: PdfFormatOption(pipeline_options=options),
                 InputFormat.IMAGE: ImageFormatOption(pipeline_options=options)})
         return self._ocr_converter
 
-    def _ocr_text(self, path: Path) -> str:
+    def _ocr_text(self, path: Path, minimum: int = MIN_TEXT_CHARS) -> str:
+        """1. Docling + Apple Vision en page entière (garde la mise en forme) ;
+        2. si le résultat est trop maigre : Apple Vision directement, texte brut ligne par ligne."""
         ext = path.suffix.lower()
         if ext == ".heic":  # non pris en charge par Docling : conversion locale par sips (macOS)
             with tempfile.TemporaryDirectory(prefix="penny-ocr-") as tmp:
@@ -90,10 +118,34 @@ class LocalExtractor:
                                      capture_output=True, text=True, check=False)
                 if res.returncode != 0 or not jpg.exists():
                     raise Unsupported("conversion_heic_impossible")
-                return self._ocr().convert(str(jpg)).document.export_to_markdown()
+                return self._ocr_text(jpg, minimum)
         if ext not in DOCLING_IMAGE_EXT and ext != ".pdf":
             raise Unsupported("format_image_non_pris_en_charge")
-        return self._ocr().convert(str(path)).document.export_to_markdown()
+        text = self._ocr().convert(str(path)).document.export_to_markdown()
+        if meaningful(text, minimum):
+            return text
+        raw = self._vision_raw(path)
+        return raw if meaningful(raw, minimum) else text
+
+    def _vision_lines(self, image) -> list:
+        """Apple Vision via ocrmac : [(texte, confiance, [x, y, l, h])], coordonnées relatives,
+        origine en bas à gauche (vérifié dans le code source d'ocrmac 1.0.1)."""
+        if sys.platform != "darwin":
+            raise Unsupported("ocr_indisponible_hors_mac")
+        try:
+            from ocrmac.ocrmac import text_from_image
+        except ImportError as exc:
+            raise Unsupported("ocr_absent") from exc
+        return text_from_image(image, recognition_level="accurate", language_preference=OCR_LANGS)
+
+    def _vision_raw(self, path: Path) -> str:
+        """Texte brut par Apple Vision, page par page (PDF rendus en images par pypdfium2)."""
+        from PIL import Image
+        if path.suffix.lower() == ".pdf":
+            pages = [page_text(self._vision_lines(img)) for img in render_pdf_pages(path)]
+            return "\n\n".join(p for p in pages if p)
+        with Image.open(path) as img:
+            return page_text(self._vision_lines(img.convert("RGB")))
 
     def _docling(self):
         if self._converter is None:
@@ -118,9 +170,9 @@ class LocalExtractor:
         if ext in IMAGE_EXT:
             if not ocr:
                 raise NoText("image")
-            text = self._ocr_text(path)
+            text = self._ocr_text(path, MIN_OCR_IMAGE_CHARS)
             if not meaningful(text, MIN_OCR_IMAGE_CHARS):
-                raise NoText("photo_sans_texte")
+                raise NoText("photo_vide")
             return text
         if ext in TEXT_EXT:
             text = path.read_text(encoding="utf-8", errors="replace")
@@ -133,6 +185,6 @@ class LocalExtractor:
                 text = self._ocr_text(path)
                 if meaningful(text):
                     return text
-                raise NoText("ocr_sans_texte")
+                raise NoText("ocr_vide")
             raise NoText("sans_texte")
         return text

@@ -474,7 +474,11 @@ Utilisation : le premier passage reste sans OCR (rapide) ; ensuite
 ```
 $ penny-lancer scan "<dossier>" --ocr --limit 20 --details
 ```
-reprend **seulement** les PDF sans texte et les images des dossiers *à analyser*. Une image où l'OCR
+reprend **seulement** les PDF sans texte et les images des dossiers *à analyser*.
+Méthode (corrigée le 20/11 après une carte d'identité scannée classée « illisible ») : Docling avec
+Apple Vision en **page entière** (sinon le texte situé dans une zone classée « image » est écarté) ;
+si le résultat reste trop maigre, **Apple Vision directement**, page par page, texte brut remis dans
+l'ordre de lecture. Les fichiers classés « illisibles » par la première version sont retentés une fois. Une image où l'OCR
 trouve trop peu de texte est une photo : classée « photo (OCR : pas de texte) », jamais reprise.
 Pour éviter d'OCRiser des milliers de photos de vacances : les mettre en *Inventaire seul* avec
 `penny-lancer dossiers "<dossier>" --revoir`.
